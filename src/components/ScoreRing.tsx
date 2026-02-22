@@ -23,7 +23,7 @@ const textColorMap = {
   destructive: "text-destructive",
 };
 
-const ScoreRing = ({ value, max, size = 56, strokeWidth = 4, label, color = "primary" }: ScoreRingProps) => {
+const ScoreRing = ({ value, max, size = 52, strokeWidth = 3, label, color = "primary" }: ScoreRingProps) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(value / max, 1);
@@ -58,7 +58,7 @@ const ScoreRing = ({ value, max, size = 56, strokeWidth = 4, label, color = "pri
           {value}
         </span>
       </div>
-      {label && <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>}
+      {label && <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>}
     </div>
   );
 };
