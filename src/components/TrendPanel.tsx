@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Copy, Check } from "lucide-react";
 import { TrendData } from "@/data/mockTrends";
 import ScoreRing from "./ScoreRing";
+import MeterBar from "./MeterBar";
 import EntryBadge from "./EntryBadge";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -10,11 +11,10 @@ interface TrendPanelProps {
   onClose: () => void;
 }
 
-type Tab = "signals" | "risk" | "market" | "roi" | "brief";
+type Tab = "signals" | "market" | "roi" | "brief";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "signals", label: "Signals" },
-  { key: "risk", label: "Risk" },
   { key: "market", label: "Market" },
   { key: "roi", label: "ROI" },
   { key: "brief", label: "Founder Brief" },
@@ -22,6 +22,7 @@ const tabs: { key: Tab; label: string }[] = [
 
 const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
   const [activeTab, setActiveTab] = useState<Tab>("signals");
+  const [copied, setCopied] = useState(false);
 
   const chartData = trend.google_trends_data.map((v, i) => ({
     month: `M${i + 1}`,
@@ -29,32 +30,38 @@ const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
     reddit: trend.reddit_mentions[i],
   }));
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(trend.founder_brief);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-card border-l border-border z-50 animate-slide-in-right flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-border">
+      <div className="flex items-center justify-between p-6 border-b border-border">
         <div>
-          <h2 className="text-lg font-bold text-foreground">{trend.trend_name}</h2>
-          <div className="flex items-center gap-3 mt-1">
+          <h2 className="text-base font-bold text-foreground">{trend.trend_name}</h2>
+          <div className="flex items-center gap-3 mt-1.5">
             <EntryBadge window={trend.entry_window} />
-            <span className="font-mono text-sm text-primary">{trend.trend_score}/100</span>
+            <span className="font-mono text-sm text-primary font-semibold">{trend.trend_score}/100</span>
           </div>
         </div>
         <button
           onClick={onClose}
           className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
         >
-          <X size={18} />
+          <X size={16} />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border px-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+            className={`flex-1 py-3 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
               activeTab === tab.key
                 ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
@@ -66,36 +73,46 @@ const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {activeTab === "signals" && (
-          <div className="space-y-6">
+          <>
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">Google Trends vs Reddit Mentions</h3>
-              <div className="glass-card p-4 h-48">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Signal Velocity</h3>
+              <div className="glass-card p-4 h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(215, 15%, 55%)' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: 'hsl(215, 15%, 55%)' }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(220, 10%, 46%)' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: 'hsl(220, 10%, 46%)' }} axisLine={false} tickLine={false} width={30} />
                     <Tooltip
-                      contentStyle={{ background: 'hsl(220, 18%, 12%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: '8px', fontSize: '12px' }}
-                      labelStyle={{ color: 'hsl(210, 20%, 92%)' }}
+                      contentStyle={{ background: 'hsl(225, 14%, 11%)', border: '1px solid hsl(225, 12%, 15%)', borderRadius: '6px', fontSize: '11px' }}
+                      labelStyle={{ color: 'hsl(210, 15%, 93%)' }}
                     />
-                    <Line type="monotone" dataKey="google" stroke="hsl(185, 80%, 50%)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="reddit" stroke="hsl(45, 90%, 55%)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="google" stroke="hsl(187, 80%, 48%)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="reddit" stroke="hsl(82, 70%, 50%)" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <div className="flex gap-4 mt-2">
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <span className="w-3 h-0.5 bg-primary rounded" /> Google Trends
                 </span>
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="w-3 h-0.5 bg-accent rounded" /> Reddit Mentions
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="w-3 h-0.5 bg-success rounded" /> Reddit Mentions
                 </span>
               </div>
             </div>
+
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">Evidence Snippets</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Risk Metrics</h3>
+              <div className="space-y-2.5">
+                <MeterBar value={trend.fad_risk} max={100} label="Fad Risk" color={trend.fad_risk > 30 ? "warning" : "primary"} />
+                <MeterBar value={trend.structural_shift} max={100} label="Structural" color="success" />
+                <MeterBar value={trend.feasibility} max={100} label="Feasible" color="primary" />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Evidence</h3>
               <div className="space-y-2">
                 {trend.evidence_snippets.map((snippet, i) => (
                   <div key={i} className="glass-card p-3">
@@ -104,109 +121,88 @@ const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
                 ))}
               </div>
             </div>
-          </div>
-        )}
 
-        {activeTab === "risk" && (
-          <div className="space-y-6">
-            <div className="flex gap-6">
-              <ScoreRing value={trend.fad_risk} max={100} size={80} strokeWidth={5} label="Fad Risk" color="destructive" />
-              <ScoreRing value={trend.structural_shift} max={100} size={80} strokeWidth={5} label="Structural" color="success" />
-            </div>
             <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Regulatory Risk</h4>
-              <p className="text-sm text-secondary-foreground leading-relaxed">{trend.regulatory_risk}</p>
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Regulatory</h4>
+              <p className="text-xs text-secondary-foreground leading-relaxed">{trend.regulatory_risk}</p>
             </div>
-            <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Signal Coherence</h4>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
-                  <div
-                    className="h-full gradient-primary rounded-full transition-all duration-1000"
-                    style={{ width: `${(trend.coherence / 20) * 100}%` }}
-                  />
-                </div>
-                <span className="font-mono text-sm text-primary">{trend.coherence}/20</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {trend.coherence >= 15
-                  ? "Strong alignment between search and social signals. High confidence."
-                  : trend.coherence >= 10
-                  ? "Moderate alignment. Signals trending in same direction."
-                  : "Weak alignment. Signals may be noise."}
-              </p>
-            </div>
-          </div>
+          </>
         )}
 
         {activeTab === "market" && (
-          <div className="space-y-4">
-            <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Price Ladder</h4>
-              <p className="text-sm text-foreground font-mono">{trend.price_ladder}</p>
-            </div>
-            <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Format Recommendation</h4>
-              <p className="text-sm text-secondary-foreground">{trend.format_recommendation}</p>
-            </div>
-            <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Competition Index</h4>
-              <div className="flex items-center gap-3">
-                <ScoreRing value={trend.competition} max={15} size={64} strokeWidth={4} color={trend.competition > 10 ? "destructive" : "warning"} />
-                <p className="text-xs text-muted-foreground flex-1">
-                  {trend.competition <= 5
-                    ? "Blue ocean. Minimal competition. First-mover advantage available."
-                    : trend.competition <= 10
-                    ? "Moderate competition. Differentiation required."
-                    : "Red ocean. High competition. Need strong USP."}
-                </p>
+          <>
+            {[
+              { label: "Price Ladder", value: trend.price_ladder },
+              { label: "Format", value: trend.format_recommendation },
+              { label: "TAM Band", value: trend.tam_band },
+            ].map((item) => (
+              <div key={item.label} className="glass-card p-4">
+                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{item.label}</h4>
+                <p className="text-sm text-foreground">{item.value}</p>
               </div>
+            ))}
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Competition</h3>
+              <MeterBar value={trend.competition} max={15} label="Index" color={trend.competition > 10 ? "warning" : "primary"} />
+              <p className="text-xs text-muted-foreground mt-2">
+                {trend.competition <= 5
+                  ? "Blue ocean. Minimal competition. First-mover advantage available."
+                  : trend.competition <= 10
+                  ? "Moderate competition. Differentiation required."
+                  : "Red ocean. High competition. Strong USP needed."}
+              </p>
             </div>
-          </div>
+          </>
         )}
 
         {activeTab === "roi" && (
-          <div className="space-y-4">
+          <>
             {[
               { label: "TAM Band", value: trend.tam_band },
               { label: "CAC Band", value: trend.cac_band },
               { label: "Margin Band", value: trend.margin_band },
-              { label: "Payback Estimate", value: trend.payback_estimate },
+              { label: "Payback", value: trend.payback_estimate },
             ].map((item) => (
               <div key={item.label} className="glass-card p-4 flex items-center justify-between">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</span>
                 <span className="font-mono text-sm text-foreground">{item.value}</span>
               </div>
             ))}
-            <div className="glass-card p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Feasibility Score</h4>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-3 bg-border rounded-full overflow-hidden">
-                  <div
-                    className="h-full gradient-primary rounded-full transition-all duration-1000"
-                    style={{ width: `${trend.feasibility}%` }}
-                  />
-                </div>
-                <span className="font-mono text-sm text-primary">{trend.feasibility}%</span>
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Feasibility</h3>
+              <MeterBar value={trend.feasibility} max={100} label="Score" color="primary" />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dominance Probability</h3>
+              <div className="flex items-center gap-4">
+                <ScoreRing value={trend.dominance_prob} max={100} size={56} strokeWidth={3} color="primary" />
+                <p className="text-xs text-muted-foreground flex-1">
+                  {trend.dominance_prob >= 65
+                    ? "High probability of establishing market dominance."
+                    : trend.dominance_prob >= 50
+                    ? "Moderate dominance potential with right execution."
+                    : "Challenging path to market dominance. Niche play recommended."}
+                </p>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {activeTab === "brief" && (
-          <div className="space-y-4">
+          <>
             <div className="glass-card p-5">
               <p className="text-sm text-secondary-foreground leading-relaxed whitespace-pre-wrap">
                 {trend.founder_brief}
               </p>
             </div>
             <button
-              onClick={() => navigator.clipboard.writeText(trend.founder_brief)}
-              className="w-full py-2.5 px-4 gradient-primary text-primary-foreground font-semibold text-sm rounded-lg hover:opacity-90 transition-opacity"
+              onClick={handleCopy}
+              className="w-full py-2.5 px-4 bg-primary/10 border border-primary/20 text-primary font-medium text-sm rounded-lg hover:bg-primary/15 transition-colors flex items-center justify-center gap-2"
             >
-              Copy Founder Brief
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? "Copied" : "Copy Founder Brief"}
             </button>
-          </div>
+          </>
         )}
       </div>
     </div>

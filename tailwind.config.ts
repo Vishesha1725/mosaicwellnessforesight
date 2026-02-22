@@ -93,8 +93,8 @@ export default {
           to: { opacity: "1" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px -5px hsl(var(--primary) / 0.3)" },
-          "50%": { boxShadow: "0 0 30px -5px hsl(var(--primary) / 0.5)" },
+          "0%, 100%": { boxShadow: "0 0 20px -5px hsl(var(--primary) / 0.2)" },
+          "50%": { boxShadow: "0 0 30px -5px hsl(var(--primary) / 0.4)" },
         },
         "score-fill": {
           from: { strokeDashoffset: "283" },
