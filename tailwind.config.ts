@@ -36,7 +36,7 @@ export default {
   				'monospace'
   			],
   			serif: [
-  				'Playfair Display',
+  				'Merriweather',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
