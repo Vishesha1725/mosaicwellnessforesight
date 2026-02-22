@@ -14,7 +14,145 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      evidence: {
+        Row: {
+          id: string
+          payload_json: Json | null
+          snippets_json: Json | null
+          source: string
+          trend_id: string
+        }
+        Insert: {
+          id?: string
+          payload_json?: Json | null
+          snippets_json?: Json | null
+          source: string
+          trend_id: string
+        }
+        Update: {
+          id?: string
+          payload_json?: Json | null
+          snippets_json?: Json | null
+          source?: string
+          trend_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_trend_id_fkey"
+            columns: ["trend_id"]
+            isOneToOne: false
+            referencedRelation: "trends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      radar_runs: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          status: string
+          time_window: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          status?: string
+          time_window?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          status?: string
+          time_window?: number
+        }
+        Relationships: []
+      }
+      trends: {
+        Row: {
+          cac_band: string | null
+          coherence: number
+          competition: number
+          dominance_prob: number
+          entry_window: string
+          fad_risk: number
+          feasibility: number
+          format_recommendation: string | null
+          founder_brief: string | null
+          google_trends_data: Json | null
+          id: string
+          margin_band: string | null
+          payback_estimate: string | null
+          price_ladder: string | null
+          reddit_mentions: Json | null
+          regulatory_risk: string | null
+          run_id: string
+          structural_shift: number
+          tam_band: string | null
+          trend_name: string
+          trend_score: number
+          velocity: number
+        }
+        Insert: {
+          cac_band?: string | null
+          coherence?: number
+          competition?: number
+          dominance_prob?: number
+          entry_window?: string
+          fad_risk?: number
+          feasibility?: number
+          format_recommendation?: string | null
+          founder_brief?: string | null
+          google_trends_data?: Json | null
+          id?: string
+          margin_band?: string | null
+          payback_estimate?: string | null
+          price_ladder?: string | null
+          reddit_mentions?: Json | null
+          regulatory_risk?: string | null
+          run_id: string
+          structural_shift?: number
+          tam_band?: string | null
+          trend_name: string
+          trend_score?: number
+          velocity?: number
+        }
+        Update: {
+          cac_band?: string | null
+          coherence?: number
+          competition?: number
+          dominance_prob?: number
+          entry_window?: string
+          fad_risk?: number
+          feasibility?: number
+          format_recommendation?: string | null
+          founder_brief?: string | null
+          google_trends_data?: Json | null
+          id?: string
+          margin_band?: string | null
+          payback_estimate?: string | null
+          price_ladder?: string | null
+          reddit_mentions?: Json | null
+          regulatory_risk?: string | null
+          run_id?: string
+          structural_shift?: number
+          tam_band?: string | null
+          trend_name?: string
+          trend_score?: number
+          velocity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trends_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "radar_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
