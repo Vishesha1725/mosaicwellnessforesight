@@ -15,20 +15,17 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Source Sans Pro',
+  				'Poppins',
   				'ui-sans-serif',
   				'system-ui',
-  				'-apple-system',
-  				'BlinkMacSystemFont',
-  				'Segoe UI',
-  				'Roboto',
-  				'Helvetica Neue',
-  				'Arial',
-  				'Noto Sans',
-  				'sans-serif'
+  				'sans-serif',
+  				'Apple Color Emoji',
+  				'Segoe UI Emoji',
+  				'Segoe UI Symbol',
+  				'Noto Color Emoji'
   			],
   			mono: [
-  				'Source Code Pro',
+  				'Space Mono',
   				'ui-monospace',
   				'SFMono-Regular',
   				'Menlo',
@@ -39,7 +36,7 @@ export default {
   				'monospace'
   			],
   			serif: [
-  				'Source Serif Pro',
+  				'Playfair Display',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
