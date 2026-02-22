@@ -25,7 +25,7 @@ export default {
   				'Noto Color Emoji'
   			],
   			mono: [
-  				'Space Mono',
+  				'IBM Plex Mono',
   				'ui-monospace',
   				'SFMono-Regular',
   				'Menlo',
