@@ -1,51 +1,50 @@
 import { TrendData } from "@/data/mockTrends";
 import ScoreRing from "./ScoreRing";
 import EntryBadge from "./EntryBadge";
-import { ArrowRight, TrendingUp, Shield, DollarSign, Target } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 interface TopOpportunityProps {
   trend: TrendData;
   onViewBrief: () => void;
 }
 
-const getStrategicHighlights = (trend: TrendData) => [
-  {
-    label: "Demand Elasticity",
-    text: trend.velocity >= 22
-      ? "High search velocity signals strong inbound demand — price sensitivity is low in early adopters."
-      : "Moderate search velocity indicates growing but price-conscious demand — lean into value positioning.",
-  },
-  {
-    label: "Repeat Purchase Potential",
-    text: trend.coherence >= 16
-      ? "High signal coherence across channels suggests genuine repeat intent, not one-time curiosity."
-      : "Moderate coherence — build subscription mechanics early to lock in retention before novelty fades.",
-  },
-  {
-    label: "Consumer Signal Strength",
-    text: trend.structural_shift >= 70
-      ? `${trend.structural_shift}% structural shift with ${trend.fad_risk}% fad risk — this is a durable behavioral change, not a trend cycle.`
-      : `${trend.structural_shift}% structural shift — promising but monitor fad risk (${trend.fad_risk}%) closely over next quarter.`,
-  },
-  {
-    label: "Competitive Whitespace",
-    text: trend.competition <= 6
-      ? `Competition index of ${trend.competition}/15 — significant whitespace exists. First-mover advantage is real and defensible.`
-      : `Competition index of ${trend.competition}/15 — moderate crowding. Differentiate on format, brand, or channel strategy.`,
-  },
-];
-
-const getFounderConclusion = (trend: TrendData): string => {
-  if (trend.dominance_prob >= 65) {
-    return `${trend.trend_name} presents a rare convergence of high velocity, low competition, and strong structural tailwinds. The ${trend.margin_band} margin profile with ${trend.payback_estimate} payback makes this a capital-efficient first bet. Move decisively — the window is ${trend.entry_window.toLowerCase()} and closing.`;
+const getWhyNow = (trend: TrendData): string => {
+  if (trend.velocity >= 22) {
+    return `Search is accelerating (velocity ${trend.velocity}) + Reddit chatter is rising → early adopter demand is real.`;
   }
-  return `${trend.trend_name} shows promising fundamentals with a ${trend.dominance_prob}% dominance probability. The ${trend.tam_band} TAM provides sufficient runway for scale. Execute with discipline on unit economics and brand positioning to capture the opportunity before the window shifts.`;
+  return `Search momentum building (velocity ${trend.velocity}) with consistent Reddit signal → demand forming.`;
+};
+
+const getWhitespace = (trend: TrendData): string => {
+  if (trend.competition <= 6) {
+    return `Competition is still low (${trend.competition}/15) in this format → first-mover edge.`;
+  }
+  return `Moderate competition (${trend.competition}/15) but format gap exists → differentiation wins.`;
+};
+
+const getMoney = (trend: TrendData): string => {
+  return `TAM ${trend.tam_band} + margins ${trend.margin_band} → scalable fast.`;
+};
+
+const getMove = (trend: TrendData): string => {
+  const weeks = trend.entry_window === "Early" ? "4–6" : trend.entry_window === "Optimal" ? "6–8" : "8–12";
+  return `Launch a pilot in ${weeks} weeks. If CAC stays below ${trend.cac_band.split("–")[1] || trend.cac_band}, scale hard.`;
+};
+
+const getCreativeAngle = (trend: TrendData): string => {
+  // Generate a punchy creative hook based on the trend
+  const hooks: Record<string, string> = {
+    "Ashwagandha Gummies": `"Make stress relief feel like candy: Ashwagandha gummies positioned as 'calm-in-60' nightly ritual."`,
+    "Mushroom Coffee Blends": `"Smart coffee for sharp mornings: Lion's Mane-infused brew positioned as 'focus fuel for founders.'"`,
+    "Peptide Serums": `"Skip the clinic, keep the results: peptide serums positioned as 'dermatologist-grade, your bathroom.'"`,
+    "Probiotic Sparkling Water": `"Gut health that pops: probiotic sparkling water positioned as 'the soda upgrade you actually enjoy.'"`,
+    "Magnesium Glycinate Sticks": `"Calm in your pocket: magnesium sticks positioned as 'the 3pm reset' for burned-out professionals."`,
+    "Makhana Chips": `"Crunch without the guilt: makhana chips positioned as 'the snack your nutritionist actually approves.'"`,
+  };
+  return hooks[trend.trend_name] || `"Own the '${trend.trend_name.toLowerCase()}' ritual: position as a daily habit, not a product."`;
 };
 
 const TopOpportunity = ({ trend, onViewBrief }: TopOpportunityProps) => {
-  const highlights = getStrategicHighlights(trend);
-  const conclusion = getFounderConclusion(trend);
-
   return (
     <div className="relative overflow-hidden rounded-xl bg-card/80 backdrop-blur-xl border border-border p-8"
       style={{
@@ -66,8 +65,8 @@ const TopOpportunity = ({ trend, onViewBrief }: TopOpportunityProps) => {
           Top Opportunity
         </p>
 
-        {/* Header row: name + key metrics */}
-        <div className="flex items-start gap-8 mb-8">
+        {/* Header row */}
+        <div className="flex items-start gap-8 mb-6">
           <ScoreRing value={trend.trend_score} max={100} size={72} strokeWidth={3} label="Score" color="primary" />
 
           <div className="flex-1 min-w-0">
@@ -101,25 +100,36 @@ const TopOpportunity = ({ trend, onViewBrief }: TopOpportunityProps) => {
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-border mb-6" />
+        <div className="h-px bg-border mb-5" />
 
-        {/* Strategic highlights */}
-        <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 mb-8">
-          {highlights.map((h, i) => (
-            <div key={i} className="flex items-start gap-2.5">
-              <div className="w-1 h-1 rounded-full bg-primary mt-2 shrink-0" />
-              <p className="text-sm text-secondary-foreground leading-relaxed">
-                <span className="font-semibold text-foreground">{h.label}:</span>{" "}
-                {h.text}
-              </p>
-            </div>
-          ))}
+        {/* Strategic Whitespace */}
+        <div className="mb-5">
+          <p className="text-xs text-muted-foreground tracking-widest font-medium mb-3">Strategic Whitespace</p>
+          <div className="space-y-1.5">
+            <p className="text-sm text-secondary-foreground leading-relaxed">
+              <span className="font-semibold text-foreground">Why now:</span> {getWhyNow(trend)}
+            </p>
+            <p className="text-sm text-secondary-foreground leading-relaxed">
+              <span className="font-semibold text-foreground">Whitespace:</span> {getWhitespace(trend)}
+            </p>
+            <p className="text-sm text-secondary-foreground leading-relaxed">
+              <span className="font-semibold text-foreground">Money:</span> {getMoney(trend)}
+            </p>
+          </div>
         </div>
 
-        {/* Founder conclusion */}
-        <div className="bg-muted/40 border border-border rounded-lg p-5 mb-6">
-          <p className="text-sm text-secondary-foreground leading-relaxed italic">
-            {conclusion}
+        {/* Move */}
+        <div className="bg-muted/40 border border-border rounded-lg px-5 py-3 mb-5">
+          <p className="text-sm text-secondary-foreground leading-relaxed">
+            <span className="font-semibold text-primary">Move:</span> {getMove(trend)}
+          </p>
+        </div>
+
+        {/* Creative Angle */}
+        <div className="mb-6">
+          <p className="text-xs text-muted-foreground tracking-widest font-medium mb-2">Creative Angle</p>
+          <p className="text-sm text-foreground/90 italic leading-relaxed">
+            {getCreativeAngle(trend)}
           </p>
         </div>
 
