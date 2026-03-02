@@ -10,9 +10,10 @@ interface RadarHeaderProps {
   onRun: () => void;
   isLoading: boolean;
   lastUpdated: string | null;
+  dataSource?: "serpapi" | "sample" | null;
 }
 
-const RadarHeader = ({ category, timeWindow, onCategoryChange, onTimeWindowChange, onRun, isLoading, lastUpdated }: RadarHeaderProps) => {
+const RadarHeader = ({ category, timeWindow, onCategoryChange, onTimeWindowChange, onRun, isLoading, lastUpdated, dataSource }: RadarHeaderProps) => {
   return (
     <header className="glass-card p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
       <div className="flex items-center gap-3 mr-auto">
@@ -28,6 +29,17 @@ const RadarHeader = ({ category, timeWindow, onCategoryChange, onTimeWindowChang
                 <span className="text-border">·</span>
                 <p className="text-[11px] text-muted-foreground font-mono">{lastUpdated}</p>
               </>
+            )}
+            {dataSource && (
+              <span
+                className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                  dataSource === "serpapi"
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-warning/10 border-warning/30 text-warning"
+                }`}
+              >
+                {dataSource === "serpapi" ? "Live: Google Trends (SerpAPI)" : "Sample data (no key / API error)"}
+              </span>
             )}
           </div>
         </div>

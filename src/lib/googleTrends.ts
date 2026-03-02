@@ -7,6 +7,8 @@ export interface GoogleTrendsResult {
   acceleration: number;
   velocity_score: number;
   sample: boolean;
+  source: "serpapi" | "sample";
+  reason: string;
 }
 
 export async function fetchGoogleTrendsData(
@@ -19,7 +21,6 @@ export async function fetchGoogleTrendsData(
 
   if (error) {
     console.error("Google Trends fetch error:", error);
-    // Return empty sample results
     return {
       results: keywords.map((keyword) => ({
         keyword,
@@ -28,10 +29,18 @@ export async function fetchGoogleTrendsData(
         acceleration: 0,
         velocity_score: 0,
         sample: true,
+        source: "sample" as const,
+        reason: "fetch_error",
       })),
       sample_fallback: true,
     };
   }
+
+  console.log("[Radar] Google Trends response:", {
+    sample_fallback: data.sample_fallback,
+    results_count: data.results?.length,
+    sources: data.results?.map((r: any) => `${r.keyword}: ${r.source} (${r.reason})`),
+  });
 
   return data as { results: GoogleTrendsResult[]; sample_fallback: boolean };
 }
