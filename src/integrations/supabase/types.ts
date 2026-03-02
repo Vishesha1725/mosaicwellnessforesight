@@ -46,6 +46,39 @@ export type Database = {
           },
         ]
       }
+      google_trends_cache: {
+        Row: {
+          acceleration: number
+          cached_at: string
+          days: number
+          growth_pct: number
+          id: string
+          keyword: string
+          timeline: Json
+          velocity_score: number
+        }
+        Insert: {
+          acceleration?: number
+          cached_at?: string
+          days?: number
+          growth_pct?: number
+          id?: string
+          keyword: string
+          timeline?: Json
+          velocity_score?: number
+        }
+        Update: {
+          acceleration?: number
+          cached_at?: string
+          days?: number
+          growth_pct?: number
+          id?: string
+          keyword?: string
+          timeline?: Json
+          velocity_score?: number
+        }
+        Relationships: []
+      }
       radar_runs: {
         Row: {
           category: string
