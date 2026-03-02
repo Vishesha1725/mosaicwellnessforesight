@@ -144,23 +144,36 @@ export default {
   					boxShadow: '0 0 30px -5px hsl(var(--primary) / 0.4)'
   				}
   			},
-  			'score-fill': {
-  				from: {
-  					strokeDashoffset: '283'
-  				},
-  				to: {
-  					strokeDashoffset: 'var(--score-offset)'
-  				}
-  			}
-  		},
-  		animation: {
-  			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out',
-  			'slide-in-right': 'slide-in-right 0.3s ease-out',
-  			'fade-in': 'fade-in 0.3s ease-out',
-  			'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-  			'score-fill': 'score-fill 1s ease-out forwards'
-  		},
+			'score-fill': {
+				from: {
+					strokeDashoffset: '283'
+				},
+				to: {
+					strokeDashoffset: 'var(--score-offset)'
+				}
+			},
+			'radar-ping': {
+				'0%': {
+					transform: 'scale(0.5)',
+					opacity: '0.6'
+				},
+				'100%': {
+					transform: 'scale(2.5)',
+					opacity: '0'
+				}
+			}
+		},
+		animation: {
+			'accordion-down': 'accordion-down 0.2s ease-out',
+			'accordion-up': 'accordion-up 0.2s ease-out',
+			'slide-in-right': 'slide-in-right 0.3s ease-out',
+			'fade-in': 'fade-in 0.3s ease-out',
+			'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+			'score-fill': 'score-fill 1s ease-out forwards',
+			'radar-ping-1': 'radar-ping 3s ease-out infinite',
+			'radar-ping-2': 'radar-ping 3s ease-out 1s infinite',
+			'radar-ping-3': 'radar-ping 3s ease-out 2s infinite'
+		},
   		boxShadow: {
   			'2xs': 'var(--shadow-2xs)',
   			xs: 'var(--shadow-xs)',
