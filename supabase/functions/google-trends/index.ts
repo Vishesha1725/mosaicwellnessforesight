@@ -34,7 +34,7 @@ function daysToDateParam(days: number): string {
 // ── SerpAPI fetch ────────────────────────────────────────────────────
 async function fetchFromSerpApi(keyword: string, days: number) {
   const apiKey = Deno.env.get("SERPAPI_KEY");
-  if (!apiKey) throw new Error("SERPAPI_KEY not set");
+  if (!apiKey) throw new Error("missing_key");
 
   const url = new URL("https://serpapi.com/search.json");
   url.searchParams.set("engine", "google_trends");
@@ -46,7 +46,8 @@ async function fetchFromSerpApi(keyword: string, days: number) {
   const res = await fetch(url.toString());
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`SerpAPI ${res.status}: ${text}`);
+    if (res.status === 429) throw new Error("rate_limited");
+    throw new Error(`serpapi_error: ${res.status} ${text}`);
   }
   const json = await res.json();
 
@@ -76,7 +77,6 @@ function computeMetrics(timeline: { date: string; value: number }[]) {
   const slopePrev = linearSlope(vals.slice(-halfLen * 2, -halfLen));
   const acceleration = slopeRecent - slopePrev;
 
-  // normalize into 0-30
   const growthComponent = clamp(growth_pct / 10, 0, 20);
   const accelComponent = clamp(acceleration * 5, 0, 10);
   const velocity_score = Math.round(clamp(growthComponent + accelComponent, 0, 30));
@@ -85,6 +85,22 @@ function computeMetrics(timeline: { date: string; value: number }[]) {
     growth_pct: Math.round(growth_pct * 10) / 10,
     acceleration: Math.round(acceleration * 100) / 100,
     velocity_score,
+  };
+}
+
+function makeSampleResult(keyword: string, reason: string) {
+  const sampleTimeline = Array.from({ length: 12 }, (_, i) => ({
+    date: `Week ${i + 1}`,
+    value: Math.round(20 + i * 3 + Math.random() * 10),
+  }));
+  const metrics = computeMetrics(sampleTimeline);
+  return {
+    keyword,
+    timeline: sampleTimeline,
+    ...metrics,
+    sample: true,
+    source: "sample" as const,
+    reason,
   };
 }
 
@@ -106,6 +122,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    const hasApiKey = !!Deno.env.get("SERPAPI_KEY");
+
+    // If no API key, return all sample immediately
+    if (!hasApiKey) {
+      const results = keywords.map((k) => makeSampleResult(k, "missing_key"));
+      return new Response(
+        JSON.stringify({ results, sample_fallback: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -113,7 +140,6 @@ Deno.serve(async (req) => {
     const CACHE_HOURS = 6;
     const cutoff = new Date(Date.now() - CACHE_HOURS * 60 * 60 * 1000).toISOString();
 
-    // Check cache for all keywords
     const { data: cached } = await supabase
       .from("google_trends_cache")
       .select("*")
@@ -125,10 +151,8 @@ Deno.serve(async (req) => {
     (cached || []).forEach((c: any) => cachedMap.set(c.keyword, c));
 
     const uncached = keywords.filter((k) => !cachedMap.has(k));
-    const usingSample = !Deno.env.get("SERPAPI_KEY");
-    let sampleFallback = false;
+    let anySample = false;
 
-    // Fetch uncached keywords with concurrency limit of 4
     const CONCURRENCY = 4;
     const freshResults: any[] = [];
 
@@ -139,17 +163,23 @@ Deno.serve(async (req) => {
           try {
             const timeline = await fetchFromSerpApi(keyword, days);
             const metrics = computeMetrics(timeline);
-            return { keyword, timeline, ...metrics };
-          } catch (err) {
+            return {
+              keyword,
+              timeline,
+              ...metrics,
+              sample: false,
+              source: "serpapi" as const,
+              reason: "ok",
+            };
+          } catch (err: any) {
             console.error(`SerpAPI error for "${keyword}":`, err);
-            // Generate sample fallback data
-            sampleFallback = true;
-            const sampleTimeline = Array.from({ length: 12 }, (_, i) => ({
-              date: `Week ${i + 1}`,
-              value: Math.round(20 + i * 3 + Math.random() * 10),
-            }));
-            const metrics = computeMetrics(sampleTimeline);
-            return { keyword, timeline: sampleTimeline, ...metrics, sample: true };
+            anySample = true;
+            const reason = err.message?.startsWith("rate_limited")
+              ? "rate_limited"
+              : err.message?.startsWith("missing_key")
+              ? "missing_key"
+              : "serpapi_error";
+            return makeSampleResult(keyword, reason);
           }
         })
       );
@@ -159,9 +189,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert fresh results to cache
-    if (freshResults.length > 0) {
-      const rows = freshResults.map((r) => ({
+    // Upsert only live results to cache
+    const liveResults = freshResults.filter((r) => !r.sample);
+    if (liveResults.length > 0) {
+      const rows = liveResults.map((r) => ({
         keyword: r.keyword,
         days,
         timeline: r.timeline,
@@ -179,16 +210,8 @@ Deno.serve(async (req) => {
     // Build final response
     const response = keywords.map((keyword) => {
       const fresh = freshResults.find((r) => r.keyword === keyword);
-      if (fresh) {
-        return {
-          keyword: fresh.keyword,
-          timeline: fresh.timeline,
-          growth_pct: fresh.growth_pct,
-          acceleration: fresh.acceleration,
-          velocity_score: fresh.velocity_score,
-          sample: fresh.sample || false,
-        };
-      }
+      if (fresh) return fresh;
+
       const c = cachedMap.get(keyword);
       if (c) {
         return {
@@ -198,20 +221,17 @@ Deno.serve(async (req) => {
           acceleration: Number(c.acceleration),
           velocity_score: Number(c.velocity_score),
           sample: false,
+          source: "serpapi" as const,
+          reason: "ok",
         };
       }
-      return {
-        keyword,
-        timeline: [],
-        growth_pct: 0,
-        acceleration: 0,
-        velocity_score: 0,
-        sample: true,
-      };
+
+      anySample = true;
+      return makeSampleResult(keyword, "serpapi_error");
     });
 
     return new Response(
-      JSON.stringify({ results: response, sample_fallback: sampleFallback || usingSample }),
+      JSON.stringify({ results: response, sample_fallback: anySample }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

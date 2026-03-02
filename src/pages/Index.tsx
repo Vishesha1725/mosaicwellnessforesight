@@ -36,12 +36,13 @@ const Index = () => {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [googleTrendsMap, setGoogleTrendsMap] = useState<GoogleTrendsMap>({});
   const [sampleFallback, setSampleFallback] = useState(false);
+  const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
 
   const handleRun = async () => {
     setIsLoading(true);
     setSelectedTrend(null);
     setSampleFallback(false);
-
+    setDataSource(null);
     const raw = radarDataByCategory[category] || [];
     const scored = applyTimeWindowScoring(raw, timeWindow);
     const sorted = [...scored].sort((a, b) => b.trend_score - a.trend_score);
@@ -71,16 +72,16 @@ const Index = () => {
       setGoogleTrendsMap(gtMap);
       setTrends(updatedTrends);
       setSampleFallback(sample_fallback);
-
+      setDataSource(sample_fallback ? "sample" : "serpapi");
       if (sample_fallback) {
         toast.info("Using sample trends data — add SERPAPI_KEY for live Google Trends.", {
           duration: 6000,
         });
       }
     } catch {
-      // Fallback to mock data
       setTrends(sorted);
       setSampleFallback(true);
+      setDataSource("sample");
       toast.info("Using sample trends data — add SERPAPI_KEY for live Google Trends.", {
         duration: 6000,
       });
@@ -119,6 +120,7 @@ const Index = () => {
           onRun={handleRun}
           isLoading={isLoading}
           lastUpdated={lastUpdated}
+          dataSource={dataSource}
         />
 
         {sampleFallback && trends.length > 0 && (
