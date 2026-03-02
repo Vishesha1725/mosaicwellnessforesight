@@ -3,10 +3,13 @@ import RadarHeader from "@/components/RadarHeader";
 import TrendCard from "@/components/TrendCard";
 import TrendPanel from "@/components/TrendPanel";
 import TopOpportunity from "@/components/TopOpportunity";
+import RadarPulse from "@/components/RadarPulse";
+import HowItWorks from "@/components/HowItWorks";
 import { categories, TrendData } from "@/data/mockTrends";
 import { radarDataByCategory } from "@/data/radarDataByCategory";
 import { fetchGoogleTrendsData, GoogleTrendsResult } from "@/lib/googleTrends";
 import { toast } from "sonner";
+import { Radar } from "lucide-react";
 
 const applyTimeWindowScoring = (trends: TrendData[], windowDays: number): TrendData[] => {
   return trends.map((t) => {
@@ -89,9 +92,25 @@ const Index = () => {
 
   const topTrend = trends.length > 0 ? trends[0] : null;
 
+  const proofChips = ["Google Trends", "Reddit", "YouTube", "Research", "Regulatory"];
+
   return (
-    <div className="min-h-screen bg-background bg-noise p-4 sm:p-6">
-      <div className="max-w-6xl mx-auto space-y-4">
+    <div className="min-h-screen bg-noise relative overflow-hidden p-4 sm:p-6"
+      style={{
+        background: "linear-gradient(135deg, hsl(200 40% 12%) 0%, hsl(210 45% 10%) 40%, hsl(250 25% 14%) 100%)",
+      }}
+    >
+      {/* Hero gradient mesh overlay */}
+      <div
+        className="pointer-events-none fixed inset-0"
+        aria-hidden
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 30% 20%, hsl(190 60% 30% / 0.15) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 70% 60%, hsl(260 40% 35% / 0.10) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="relative z-10 max-w-6xl mx-auto space-y-4">
         <RadarHeader
           category={category}
           timeWindow={timeWindow}
@@ -110,14 +129,42 @@ const Index = () => {
         )}
 
         {trends.length === 0 && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-              <span className="text-xl">📡</span>
-            </div>
-            <h2 className="text-base font-semibold text-foreground mb-1">Ready to scan</h2>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              Select a category and time window, then hit <span className="text-primary font-medium">Run Radar</span> to discover emerging trends.
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            {/* Tagline + proof chips */}
+            <p className="text-sm sm:text-base text-muted-foreground max-w-md mb-6 leading-relaxed">
+              Detect emerging wellness trends in India before they go mainstream.
             </p>
+            <div className="flex flex-wrap justify-center gap-2 mb-10">
+              {proofChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-medium border border-border bg-card/50 text-muted-foreground"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+
+            {/* Hero empty state card */}
+            <div className="glass-card-elevated p-8 sm:p-10 max-w-lg w-full relative">
+              <div className="relative flex items-center justify-center mb-6">
+                <RadarPulse />
+                <div className="relative w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center glow-primary">
+                  <Radar size={28} className="text-primary" />
+                </div>
+              </div>
+              <h2 className="text-lg font-bold text-foreground mb-2">Ready to scan</h2>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                Pick a category + time window, then hit{" "}
+                <span className="text-primary font-medium">Run Radar</span> to generate
+                5–10 opportunity briefs.
+              </p>
+              <p className="text-[11px] text-muted-foreground/60 mt-4 font-mono">
+                Last scan: {lastUpdated ?? "—"}
+              </p>
+            </div>
+
+            <HowItWorks />
           </div>
         )}
 
