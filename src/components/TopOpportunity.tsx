@@ -1,11 +1,14 @@
 import { TrendData } from "@/data/mockTrends";
 import ScoreRing from "./ScoreRing";
 import EntryBadge from "./EntryBadge";
+import Sparkline from "./Sparkline";
 import { ArrowRight } from "lucide-react";
+import { GoogleTrendsResult } from "@/lib/googleTrends";
 
 interface TopOpportunityProps {
   trend: TrendData;
   onViewBrief: () => void;
+  googleTrends?: GoogleTrendsResult;
 }
 
 const getWhyNow = (trend: TrendData): string => {
@@ -44,7 +47,8 @@ const getCreativeAngle = (trend: TrendData): string => {
   return hooks[trend.trend_name] || `"Own the '${trend.trend_name.toLowerCase()}' ritual: position as a daily habit, not a product."`;
 };
 
-const TopOpportunity = ({ trend, onViewBrief }: TopOpportunityProps) => {
+const TopOpportunity = ({ trend, onViewBrief, googleTrends }: TopOpportunityProps) => {
+  const hasTimeline = googleTrends && googleTrends.timeline.length > 0;
   return (
     <div className="relative overflow-hidden rounded-xl bg-card/80 backdrop-blur-xl border border-border p-8"
       style={{
@@ -98,6 +102,21 @@ const TopOpportunity = ({ trend, onViewBrief }: TopOpportunityProps) => {
             </div>
           </div>
         </div>
+
+        {/* Google Trends Sparkline */}
+        {hasTimeline && (
+          <div className="flex items-center gap-4 mb-5">
+            <div className="flex-1">
+              <Sparkline data={googleTrends.timeline} height={36} />
+            </div>
+            <div className="text-right shrink-0">
+              <span className={`font-mono text-sm font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
+                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{Math.abs(googleTrends.growth_pct)}%
+              </span>
+              <p className="text-[10px] text-muted-foreground">Search growth (India)</p>
+            </div>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="h-px bg-border mb-5" />

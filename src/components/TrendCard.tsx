@@ -1,15 +1,20 @@
 import ScoreRing from "./ScoreRing";
 import EntryBadge from "./EntryBadge";
 import MeterBar from "./MeterBar";
+import Sparkline from "./Sparkline";
 import { TrendData } from "@/data/mockTrends";
+import { GoogleTrendsResult } from "@/lib/googleTrends";
 
 interface TrendCardProps {
   trend: TrendData;
   rank: number;
   onClick: () => void;
+  googleTrends?: GoogleTrendsResult;
 }
 
-const TrendCard = ({ trend, rank, onClick }: TrendCardProps) => {
+const TrendCard = ({ trend, rank, onClick, googleTrends }: TrendCardProps) => {
+  const hasTimeline = googleTrends && googleTrends.timeline.length > 0;
+
   return (
     <button
       onClick={onClick}
@@ -27,7 +32,7 @@ const TrendCard = ({ trend, rank, onClick }: TrendCardProps) => {
       />
 
       <div className="relative z-10">
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-muted-foreground">#{rank}</span>
             <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
@@ -36,6 +41,21 @@ const TrendCard = ({ trend, rank, onClick }: TrendCardProps) => {
           </div>
           <EntryBadge window={trend.entry_window} />
         </div>
+
+        {/* Sparkline + growth badge */}
+        {hasTimeline && (
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex-1">
+              <Sparkline data={googleTrends.timeline} height={28} />
+            </div>
+            <div className="text-right shrink-0">
+              <span className={`font-mono text-xs font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
+                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{Math.abs(googleTrends.growth_pct)}%
+              </span>
+              <p className="text-[9px] text-muted-foreground">Search (India)</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-6">
           <ScoreRing value={trend.trend_score} max={100} size={52} strokeWidth={2.5} label="Score" color="primary" />

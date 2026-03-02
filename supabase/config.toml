@@ -1,1 +1,4 @@
 project_id = "kukogcorohliqznxvxcx"
+
+[functions.google-trends]
+verify_jwt = false

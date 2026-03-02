@@ -4,11 +4,14 @@ import { TrendData } from "@/data/mockTrends";
 import ScoreRing from "./ScoreRing";
 import MeterBar from "./MeterBar";
 import EntryBadge from "./EntryBadge";
+import Sparkline from "./Sparkline";
+import { GoogleTrendsResult } from "@/lib/googleTrends";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 interface TrendPanelProps {
   trend: TrendData;
   onClose: () => void;
+  googleTrends?: GoogleTrendsResult;
 }
 
 type Tab = "signals" | "market" | "roi" | "brief";
@@ -20,9 +23,10 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "brief", label: "Founder Brief" },
 ];
 
-const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
+const TrendPanel = ({ trend, onClose, googleTrends }: TrendPanelProps) => {
   const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [copied, setCopied] = useState(false);
+  const hasGT = googleTrends && googleTrends.timeline.length > 0;
 
   const chartData = trend.google_trends_data.map((v, i) => ({
     month: `M${i + 1}`,
@@ -101,6 +105,34 @@ const TrendPanel = ({ trend, onClose }: TrendPanelProps) => {
                 </span>
               </div>
             </div>
+
+            {/* Google Trends Evidence */}
+            {hasGT && (
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Google Trends Evidence</h3>
+                <div className="glass-card p-4 space-y-3">
+                  <Sparkline data={googleTrends!.timeline} height={48} />
+                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Growth</p>
+                      <p className={`font-mono text-sm font-semibold ${googleTrends!.growth_pct > 0 ? "text-success" : "text-warning"}`}>
+                        {googleTrends!.growth_pct > 0 ? "+" : ""}{googleTrends!.growth_pct}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Acceleration</p>
+                      <p className="font-mono text-sm font-semibold text-foreground">{googleTrends!.acceleration}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Latest</p>
+                      <p className="font-mono text-sm font-semibold text-foreground">
+                        {googleTrends!.timeline[googleTrends!.timeline.length - 1]?.value ?? "–"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Risk Metrics</h3>

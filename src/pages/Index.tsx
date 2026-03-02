@@ -5,6 +5,8 @@ import TrendPanel from "@/components/TrendPanel";
 import TopOpportunity from "@/components/TopOpportunity";
 import { categories, TrendData } from "@/data/mockTrends";
 import { radarDataByCategory } from "@/data/radarDataByCategory";
+import { fetchGoogleTrendsData, GoogleTrendsResult } from "@/lib/googleTrends";
+import { toast } from "sonner";
 
 const applyTimeWindowScoring = (trends: TrendData[], windowDays: number): TrendData[] => {
   return trends.map((t) => {
@@ -18,6 +20,10 @@ const applyTimeWindowScoring = (trends: TrendData[], windowDays: number): TrendD
   });
 };
 
+export interface GoogleTrendsMap {
+  [keyword: string]: GoogleTrendsResult;
+}
+
 const Index = () => {
   const [category, setCategory] = useState(categories[0]);
   const [timeWindow, setTimeWindow] = useState(90);
@@ -25,17 +31,60 @@ const Index = () => {
   const [trends, setTrends] = useState<TrendData[]>([]);
   const [selectedTrend, setSelectedTrend] = useState<TrendData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [googleTrendsMap, setGoogleTrendsMap] = useState<GoogleTrendsMap>({});
+  const [sampleFallback, setSampleFallback] = useState(false);
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setIsLoading(true);
     setSelectedTrend(null);
-    setTimeout(() => {
-      const raw = radarDataByCategory[category] || [];
-      const scored = applyTimeWindowScoring(raw, timeWindow);
-      setTrends([...scored].sort((a, b) => b.trend_score - a.trend_score));
-      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
-      setIsLoading(false);
-    }, 1200);
+    setSampleFallback(false);
+
+    const raw = radarDataByCategory[category] || [];
+    const scored = applyTimeWindowScoring(raw, timeWindow);
+    const sorted = [...scored].sort((a, b) => b.trend_score - a.trend_score);
+
+    // Fetch Google Trends data for all trend keywords
+    try {
+      const keywords = sorted.map((t) => t.trend_name);
+      const { results, sample_fallback } = await fetchGoogleTrendsData(keywords, timeWindow);
+
+      const gtMap: GoogleTrendsMap = {};
+      results.forEach((r) => {
+        gtMap[r.keyword] = r;
+      });
+
+      // Update velocity scores from live data
+      const updatedTrends = sorted.map((t) => {
+        const gt = gtMap[t.trend_name];
+        if (gt && !gt.sample && gt.velocity_score > 0) {
+          return { ...t, velocity: gt.velocity_score };
+        }
+        return t;
+      });
+
+      // Re-sort after velocity update
+      updatedTrends.sort((a, b) => b.trend_score - a.trend_score);
+
+      setGoogleTrendsMap(gtMap);
+      setTrends(updatedTrends);
+      setSampleFallback(sample_fallback);
+
+      if (sample_fallback) {
+        toast.info("Using sample trends data — add SERPAPI_KEY for live Google Trends.", {
+          duration: 6000,
+        });
+      }
+    } catch {
+      // Fallback to mock data
+      setTrends(sorted);
+      setSampleFallback(true);
+      toast.info("Using sample trends data — add SERPAPI_KEY for live Google Trends.", {
+        duration: 6000,
+      });
+    }
+
+    setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+    setIsLoading(false);
   };
 
   const topTrend = trends.length > 0 ? trends[0] : null;
@@ -52,6 +101,13 @@ const Index = () => {
           isLoading={isLoading}
           lastUpdated={lastUpdated}
         />
+
+        {sampleFallback && trends.length > 0 && (
+          <div className="bg-muted/60 border border-border rounded-lg px-4 py-2.5 text-xs text-muted-foreground flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Using sample trends data — add <span className="font-mono text-primary">SERPAPI_KEY</span> for live Google Trends.</span>
+          </div>
+        )}
 
         {trends.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -98,6 +154,7 @@ const Index = () => {
             <TopOpportunity
               trend={topTrend}
               onViewBrief={() => setSelectedTrend(topTrend)}
+              googleTrends={googleTrendsMap[topTrend.trend_name]}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -107,6 +164,7 @@ const Index = () => {
                   trend={trend}
                   rank={i + 2}
                   onClick={() => setSelectedTrend(trend)}
+                  googleTrends={googleTrendsMap[trend.trend_name]}
                 />
               ))}
             </div>
@@ -121,7 +179,11 @@ const Index = () => {
             className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 animate-fade-in"
             onClick={() => setSelectedTrend(null)}
           />
-          <TrendPanel trend={selectedTrend} onClose={() => setSelectedTrend(null)} />
+          <TrendPanel
+            trend={selectedTrend}
+            onClose={() => setSelectedTrend(null)}
+            googleTrends={googleTrendsMap[selectedTrend.trend_name]}
+          />
         </>
       )}
     </div>
