@@ -50,7 +50,7 @@ const getCreativeAngle = (trend: TrendData): string => {
 const TopOpportunity = ({ trend, onViewBrief, googleTrends }: TopOpportunityProps) => {
   const hasTimeline = googleTrends && googleTrends.timeline.length > 0;
   return (
-    <div className="relative overflow-hidden rounded-xl bg-card/80 backdrop-blur-xl border border-border p-8"
+    <div className="relative overflow-hidden rounded-2xl bg-card/80 backdrop-blur-xl border border-border p-8"
       style={{
         boxShadow: "0 4px 24px -4px hsl(0 0% 0% / 0.5), inset 0 1px 1px hsl(0 0% 100% / 0.03)",
       }}

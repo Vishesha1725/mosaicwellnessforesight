@@ -18,7 +18,7 @@ const TrendCard = ({ trend, rank, onClick, googleTrends }: TrendCardProps) => {
   return (
     <button
       onClick={onClick}
-      className="relative overflow-hidden rounded-xl bg-card/70 backdrop-blur-xl border border-border p-6 text-left w-full hover:border-primary/25 transition-all duration-200 group cursor-pointer"
+      className="relative overflow-hidden rounded-2xl bg-card/80 backdrop-blur-xl border border-border p-6 text-left w-full hover:border-primary/25 transition-all duration-200 group cursor-pointer"
       style={{
         boxShadow: "0 2px 12px -2px hsl(0 0% 0% / 0.35), inset 0 1px 1px hsl(0 0% 100% / 0.02)",
       }}
