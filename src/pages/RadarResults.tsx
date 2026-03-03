@@ -74,6 +74,8 @@ const RadarResults = () => {
           <span className="text-border">·</span>
           <span className="text-foreground">{windowLabel}</span>
           <span className="text-border">·</span>
+          <span className="text-muted-foreground">Scored on: <span className="text-foreground font-semibold">{timeWindow} days</span></span>
+          <span className="text-border">·</span>
           <span className="text-muted-foreground">Signals:</span>
           {activeSources.map((s) => (
             <span key={s} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">
