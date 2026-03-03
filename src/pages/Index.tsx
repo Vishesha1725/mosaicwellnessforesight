@@ -35,8 +35,18 @@ const Index = () => {
   const [timeWindow, setTimeWindow] = useState(90);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "Research"]);
+  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends"]);
   const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
+
+  const handleCategoryChange = (v: string) => {
+    setCategory(v);
+    toast.success(`Category updated: ${v}`, { duration: 2000 });
+  };
+
+  const handleTimeWindowChange = (v: number) => {
+    setTimeWindow(v);
+    toast.success(`Time window updated: ${v} days`, { duration: 2000 });
+  };
 
   const handleToggleSource = (source: string) => {
     setActiveSources((prev) =>
@@ -71,11 +81,11 @@ const Index = () => {
 
       updatedTrends.sort((a, b) => b.trend_score - a.trend_score);
 
-      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+      const ts = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+      setLastUpdated(ts);
       setDataSource(sample_fallback ? "sample" : "serpapi");
       setIsLoading(false);
 
-      // Navigate to results with state
       navigate("/radar", {
         state: {
           trends: updatedTrends,
@@ -84,12 +94,13 @@ const Index = () => {
           dataSource: sample_fallback ? "sample" : "serpapi",
           category,
           timeWindow,
-          lastUpdated: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+          lastUpdated: ts,
           activeSources,
         },
       });
     } catch {
-      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+      const ts = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+      setLastUpdated(ts);
       setDataSource("sample");
       setIsLoading(false);
 
@@ -101,7 +112,7 @@ const Index = () => {
           dataSource: "sample",
           category,
           timeWindow,
-          lastUpdated: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+          lastUpdated: ts,
           activeSources,
         },
       });
@@ -122,7 +133,6 @@ const Index = () => {
           "linear-gradient(135deg, hsl(220 20% 6%) 0%, hsl(220 22% 8%) 40%, hsl(240 15% 10%) 100%)",
       }}
     >
-      {/* Gradient mesh overlay */}
       <div
         className="pointer-events-none fixed inset-0"
         aria-hidden
@@ -136,8 +146,8 @@ const Index = () => {
         <RadarHeader
           category={category}
           timeWindow={timeWindow}
-          onCategoryChange={setCategory}
-          onTimeWindowChange={setTimeWindow}
+          onCategoryChange={handleCategoryChange}
+          onTimeWindowChange={handleTimeWindowChange}
           onRun={handleRun}
           isLoading={isLoading}
           lastUpdated={lastUpdated}
@@ -151,7 +161,6 @@ const Index = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-8">
-            {/* Tagline */}
             <div className="max-w-lg space-y-3">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight tracking-tight">
                 Detect emerging wellness trends before they go mainstream
@@ -161,14 +170,12 @@ const Index = () => {
               </p>
             </div>
 
-            {/* Source chips */}
             <SourceChips
               sources={allSources}
               activeSources={activeSources}
               onToggle={handleToggleSource}
             />
 
-            {/* Hero empty state card */}
             <div className="glass-card-elevated p-10 max-w-lg w-full relative">
               <div className="relative flex items-center justify-center mb-8">
                 <RadarPulse />
@@ -182,9 +189,6 @@ const Index = () => {
                 <span className="text-primary font-medium">Run Radar</span> to generate
                 5–10 opportunity briefs.
               </p>
-              {!canRun && (
-                <p className="text-xs text-warning mt-4">Select at least one source to run the scan.</p>
-              )}
               <p className="text-xs text-muted-foreground/50 mt-5 font-mono">
                 Last scan: {lastUpdated ?? "—"}
               </p>

@@ -14,6 +14,7 @@ interface RadarHeaderProps {
   lastUpdated: string | null;
   dataSource?: "serpapi" | "sample" | null;
   canRun?: boolean;
+  showControls?: boolean;
 }
 
 const RadarHeader = ({
@@ -26,23 +27,31 @@ const RadarHeader = ({
   lastUpdated,
   dataSource,
   canRun = true,
+  showControls = true,
 }: RadarHeaderProps) => {
+  const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow}d`;
+
   return (
     <header className="glass-card p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 sticky top-4 z-30">
       <div className="flex items-center gap-3 mr-auto">
-        <Link to="/" className="shrink-0 hover:opacity-80 transition-opacity">
-          <img src={mosaicLogo} alt="Mosaic Wellness" className="w-9 h-9 rounded-lg object-cover" />
+        <Link to="/" className="shrink-0 cursor-pointer hover:opacity-70 transition-opacity">
+          <img
+            src={mosaicLogo}
+            alt="Mosaic Wellness"
+            className="h-8 w-auto object-contain"
+          />
         </Link>
         <div>
           <h1 className="text-base font-bold text-foreground tracking-tight leading-tight">
             Mosaic Foresight Engine
           </h1>
-          <div className="flex items-center gap-3 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <p className="text-xs text-muted-foreground">Category intelligence & trend radar</p>
             {lastUpdated && (
               <>
                 <span className="text-border">·</span>
-                <p className="text-xs text-muted-foreground font-mono">{lastUpdated}</p>
+                <span className="text-xs text-muted-foreground font-mono">{lastUpdated}</span>
+                <span className="text-xs text-muted-foreground">({windowLabel})</span>
               </>
             )}
             {dataSource && (
@@ -60,38 +69,40 @@ const RadarHeader = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={category} onValueChange={onCategoryChange}>
-          <SelectTrigger className="w-[200px] bg-secondary/50 border-border text-sm h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {showControls && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <Select value={category} onValueChange={onCategoryChange}>
+            <SelectTrigger className="w-[200px] bg-secondary/50 border-border text-sm h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={String(timeWindow)} onValueChange={(v) => onTimeWindowChange(Number(v))}>
-          <SelectTrigger className="w-[110px] bg-secondary/50 border-border text-sm h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {timeWindows.map((tw) => (
-              <SelectItem key={tw.value} value={String(tw.value)}>{tw.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={String(timeWindow)} onValueChange={(v) => onTimeWindowChange(Number(v))}>
+            <SelectTrigger className="w-[110px] bg-secondary/50 border-border text-sm h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {timeWindows.map((tw) => (
+                <SelectItem key={tw.value} value={String(tw.value)}>{tw.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <button
-          onClick={onRun}
-          disabled={isLoading || !canRun}
-          className="px-5 py-2 h-9 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          <Radar size={14} className={isLoading ? "animate-spin" : ""} />
-          {isLoading ? "Scanning…" : "Run Radar"}
-        </button>
-      </div>
+          <button
+            onClick={onRun}
+            disabled={isLoading || !canRun}
+            className="px-5 py-2 h-9 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <Radar size={14} className={isLoading ? "animate-spin" : ""} />
+            {isLoading ? "Scanning…" : "Run Radar"}
+          </button>
+        </div>
+      )}
     </header>
   );
 };
