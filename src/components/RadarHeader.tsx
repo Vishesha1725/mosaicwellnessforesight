@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { categories, timeWindows } from "@/data/mockTrends";
 import { Radar } from "lucide-react";
+import mosaicLogo from "@/assets/mosaic-logo.png";
 
 interface RadarHeaderProps {
   category: string;
@@ -11,23 +13,36 @@ interface RadarHeaderProps {
   isLoading: boolean;
   lastUpdated: string | null;
   dataSource?: "serpapi" | "sample" | null;
+  canRun?: boolean;
 }
 
-const RadarHeader = ({ category, timeWindow, onCategoryChange, onTimeWindowChange, onRun, isLoading, lastUpdated, dataSource }: RadarHeaderProps) => {
+const RadarHeader = ({
+  category,
+  timeWindow,
+  onCategoryChange,
+  onTimeWindowChange,
+  onRun,
+  isLoading,
+  lastUpdated,
+  dataSource,
+  canRun = true,
+}: RadarHeaderProps) => {
   return (
-    <header className="glass-card p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+    <header className="glass-card p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 sticky top-4 z-30">
       <div className="flex items-center gap-3 mr-auto">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-          <Radar size={16} className="text-primary" />
-        </div>
+        <Link to="/" className="shrink-0 hover:opacity-80 transition-opacity">
+          <img src={mosaicLogo} alt="Mosaic Wellness" className="w-9 h-9 rounded-lg object-cover" />
+        </Link>
         <div>
-          <h1 className="text-base font-bold text-foreground tracking-tight">Mosaic Foresight Engine</h1>
-          <div className="flex items-center gap-3">
-            <p className="text-[11px] text-muted-foreground">Category intelligence & trend radar</p>
+          <h1 className="text-base font-bold text-foreground tracking-tight leading-tight">
+            Mosaic Foresight Engine
+          </h1>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-xs text-muted-foreground">Category intelligence & trend radar</p>
             {lastUpdated && (
               <>
                 <span className="text-border">·</span>
-                <p className="text-[11px] text-muted-foreground font-mono">{lastUpdated}</p>
+                <p className="text-xs text-muted-foreground font-mono">{lastUpdated}</p>
               </>
             )}
             {dataSource && (
@@ -70,8 +85,8 @@ const RadarHeader = ({ category, timeWindow, onCategoryChange, onTimeWindowChang
 
         <button
           onClick={onRun}
-          disabled={isLoading}
-          className="px-4 py-2 h-9 bg-primary text-primary-foreground font-semibold text-sm rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+          disabled={isLoading || !canRun}
+          className="px-5 py-2 h-9 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Radar size={14} className={isLoading ? "animate-spin" : ""} />
           {isLoading ? "Scanning…" : "Run Radar"}
