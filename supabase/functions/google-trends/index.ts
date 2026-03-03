@@ -123,9 +123,11 @@ Deno.serve(async (req) => {
     }
 
     const hasApiKey = !!Deno.env.get("SERPAPI_KEY");
+    console.log(`[google-trends] SERPAPI_KEY present: ${hasApiKey}, keywords: ${keywords.length}, days: ${days}`);
 
     // If no API key, return all sample immediately
     if (!hasApiKey) {
+      console.log("[google-trends] Mode: SAMPLE (missing SERPAPI_KEY)");
       const results = keywords.map((k) => makeSampleResult(k, "missing_key"));
       return new Response(
         JSON.stringify({ results, sample_fallback: true }),
@@ -229,6 +231,10 @@ Deno.serve(async (req) => {
       anySample = true;
       return makeSampleResult(keyword, "serpapi_error");
     });
+
+    const liveCount = response.filter((r: any) => !r.sample).length;
+    const sampleCount = response.filter((r: any) => r.sample).length;
+    console.log(`[google-trends] Mode: ${anySample ? "MIXED/SAMPLE" : "LIVE"}, live=${liveCount}, sample=${sampleCount}`);
 
     return new Response(
       JSON.stringify({ results: response, sample_fallback: anySample }),
