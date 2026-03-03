@@ -4,8 +4,8 @@ import RadarHeader from "@/components/RadarHeader";
 import TopOpportunity from "@/components/TopOpportunity";
 import TrendCard from "@/components/TrendCard";
 import TrendPanel from "@/components/TrendPanel";
-import { TrendData, categories } from "@/data/mockTrends";
-import { GoogleTrendsResult } from "@/lib/googleTrends";
+import { TrendData } from "@/data/mockTrends";
+import { timeWindows } from "@/data/mockTrends";
 import { GoogleTrendsMap } from "@/pages/Index";
 
 interface RadarState {
@@ -35,6 +35,7 @@ const RadarResults = () => {
 
   const { trends, googleTrendsMap, sampleFallback, dataSource, category, timeWindow, lastUpdated, activeSources } = state;
   const topTrend = trends.length > 0 ? trends[0] : null;
+  const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow} Days`;
 
   return (
     <div
@@ -63,7 +64,29 @@ const RadarResults = () => {
           isLoading={false}
           lastUpdated={lastUpdated}
           dataSource={dataSource}
+          showControls={false}
         />
+
+        {/* Scan Config Summary */}
+        <div className="glass-card px-5 py-3 flex items-center gap-4 flex-wrap text-xs">
+          <span className="text-muted-foreground font-medium">Scan Config:</span>
+          <span className="text-foreground font-semibold">{category}</span>
+          <span className="text-border">·</span>
+          <span className="text-foreground">{windowLabel}</span>
+          <span className="text-border">·</span>
+          <span className="text-muted-foreground">Signals:</span>
+          {activeSources.map((s) => (
+            <span key={s} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">
+              {s}
+            </span>
+          ))}
+          <button
+            onClick={() => navigate("/")}
+            className="ml-auto text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            ← New Scan
+          </button>
+        </div>
 
         {sampleFallback && (
           <div className="bg-warning/10 border border-warning/20 rounded-2xl px-5 py-3 text-xs text-warning flex items-center gap-2">
@@ -71,16 +94,6 @@ const RadarResults = () => {
             <span>Using sample trends data — add <span className="font-mono">SERPAPI_KEY</span> for live Google Trends.</span>
           </div>
         )}
-
-        {/* Active sources summary */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-muted-foreground">Sources:</span>
-          {activeSources.map((s) => (
-            <span key={s} className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">
-              {s}
-            </span>
-          ))}
-        </div>
 
         {topTrend && (
           <>
@@ -105,7 +118,6 @@ const RadarResults = () => {
         )}
       </div>
 
-      {/* Side Panel Overlay */}
       {selectedTrend && (
         <>
           <div
