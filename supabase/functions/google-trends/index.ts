@@ -27,7 +27,7 @@ function clamp(v: number, lo: number, hi: number) {
 function daysToDateParam(days: number): string {
   if (days <= 30) return "today 1-m";
   if (days <= 90) return "today 3-m";
-  if (days <= 180) return "today 6-m";
+  // SerpApi doesn't support "today 6-m"; use "today 12-m" for 180-day window
   return "today 12-m";
 }
 
