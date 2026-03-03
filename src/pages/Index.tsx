@@ -15,13 +15,44 @@ const allSources = ["Google Trends", "YouTube", "Amazon", "Research", "Regulator
 
 const applyTimeWindowScoring = (trends: TrendData[], windowDays: number): TrendData[] => {
   return trends.map((t) => {
-    let adjustedScore = t.trend_score;
+    const gtd = t.google_trends_data;
+
     if (windowDays === 30) {
-      adjustedScore = Math.round(t.trend_score * 0.9 + (t.velocity / 30) * 10);
-    } else if (windowDays === 180) {
-      adjustedScore = Math.round(t.trend_score * 0.9 + (t.coherence / 20) * 10);
+      // 30-day: emphasise recent spikes & velocity; RecencyBoost
+      const recentSlice = gtd.slice(-3);
+      const recentAvg = recentSlice.reduce((s, v) => s + v, 0) / (recentSlice.length || 1);
+      const fullAvg = gtd.reduce((s, v) => s + v, 0) / (gtd.length || 1);
+      const recencyBoost = Math.min(((recentAvg - fullAvg) / Math.max(fullAvg, 1)) * 40, 20);
+      const velocityBoost = (t.velocity / 30) * 15;
+      const adjustedScore = Math.round(
+        t.trend_score * 0.65 + velocityBoost + recencyBoost + (t.fad_risk < 25 ? 5 : 0)
+      );
+      return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
     }
-    return { ...t, trend_score: Math.min(adjustedScore, 99) };
+
+    if (windowDays === 180) {
+      // 180-day: penalise short spikes (SpikePenalty), reward structural durability
+      const firstHalf = gtd.slice(0, Math.ceil(gtd.length / 2));
+      const secondHalf = gtd.slice(Math.ceil(gtd.length / 2));
+      const avgFirst = firstHalf.reduce((s, v) => s + v, 0) / (firstHalf.length || 1);
+      const avgSecond = secondHalf.reduce((s, v) => s + v, 0) / (secondHalf.length || 1);
+      const sustainedGrowth = avgSecond > avgFirst ? (avgSecond - avgFirst) / Math.max(avgFirst, 1) : 0;
+
+      // Spike penalty: high velocity + high fad_risk = penalised
+      const spikePenalty = t.fad_risk > 28 && t.velocity > 22 ? 12 : t.fad_risk > 28 ? 6 : 0;
+      const coherenceBoost = (t.coherence / 20) * 12;
+      const structuralBoost = (t.structural_shift / 100) * 10;
+      const adjustedScore = Math.round(
+        t.trend_score * 0.55 + coherenceBoost + structuralBoost + sustainedGrowth * 15 - spikePenalty
+      );
+      return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
+    }
+
+    // 90-day (default): balanced — slight velocity + coherence mix
+    const velocityComponent = (t.velocity / 30) * 8;
+    const coherenceComponent = (t.coherence / 20) * 7;
+    const adjustedScore = Math.round(t.trend_score * 0.78 + velocityComponent + coherenceComponent);
+    return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
   });
 };
 
