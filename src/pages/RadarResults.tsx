@@ -91,9 +91,12 @@ const RadarResults = () => {
         </div>
 
         {sampleFallback && (
-          <div className="bg-warning/10 border border-warning/20 rounded-2xl px-5 py-3 text-xs text-warning flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Using sample trends data — add <span className="font-mono">SERPAPI_KEY</span> for live Google Trends.</span>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 text-sm text-amber-300 flex items-center gap-3">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <span className="font-semibold text-amber-200">Demo mode:</span>{" "}
+              <span>Live data unavailable (API error / quota). Showing sample trends data.</span>
+            </div>
           </div>
         )}
 
