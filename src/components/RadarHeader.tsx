@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { categories, timeWindows } from "@/data/mockTrends";
+import { timeWindows } from "@/data/mockTrends";
+import { categories } from "@/data/categoryConfig";
 import { Radar } from "lucide-react";
 import mosaicLogo from "@/assets/mosaic-logo.png";
 
@@ -62,7 +63,7 @@ const RadarHeader = ({
                     : "bg-warning/10 border-warning/30 text-warning"
                 }`}
               >
-                {dataSource === "serpapi" ? "Live: Google Trends (SerpAPI)" : "Sample data (no key / API error)"}
+                {dataSource === "serpapi" ? "Live Discovery" : "Demo mode (missing keys / source error)"}
               </span>
             )}
           </div>

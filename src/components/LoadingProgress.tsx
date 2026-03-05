@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Radio, Youtube, ShieldCheck, BarChart3, FileText, Check, Loader2 } from "lucide-react";
+import { Radio, Youtube, MessageCircle, BarChart3, FileText, Check, Loader2 } from "lucide-react";
 
 const steps = [
-  { label: "Fetching Trends", icon: Radio },
+  { label: "Discovering Queries", icon: Radio },
   { label: "Fetching YouTube", icon: Youtube },
-  { label: "Checking Competition", icon: ShieldCheck },
+  { label: "Scanning Reddit", icon: MessageCircle },
   { label: "Scoring", icon: BarChart3 },
-  { label: "Generating Brief", icon: FileText },
+  { label: "Building Founder Memos", icon: FileText },
 ];
 
 interface LoadingProgressProps {

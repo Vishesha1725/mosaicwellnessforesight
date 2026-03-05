@@ -3,18 +3,18 @@ import { Radio, BarChart3, FileText } from "lucide-react";
 const steps = [
   {
     icon: Radio,
-    title: "Scan signals",
-    desc: "Pull real-time data from Google Trends, YouTube, Amazon, and research databases.",
+    title: "Discover queries",
+    desc: "Start from 6 category anchors, expand with live related rising queries, and build fresh candidates automatically.",
   },
   {
     icon: BarChart3,
-    title: "Score trends",
-    desc: "Rank each signal by velocity, coherence, competition, and structural shift.",
+    title: "Score quality",
+    desc: "Score each candidate on growth speed, durability, creator momentum, and discussion depth.",
   },
   {
     icon: FileText,
-    title: "Generate briefs",
-    desc: "Get founder-ready opportunity briefs with TAM, entry window, and go-to-market hooks.",
+    title: "Ship founder memos",
+    desc: "Get 5-10 ranked trends with REAL/FAD labels, proof bullets, and clear launch format ideas.",
   },
 ];
 

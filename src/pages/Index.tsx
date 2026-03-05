@@ -5,81 +5,39 @@ import RadarPulse from "@/components/RadarPulse";
 import HowItWorks from "@/components/HowItWorks";
 import SourceChips from "@/components/SourceChips";
 import LoadingProgress from "@/components/LoadingProgress";
-import { categories, TrendData } from "@/data/mockTrends";
-import { radarDataByCategory } from "@/data/radarDataByCategory";
-import { fetchGoogleTrendsData, GoogleTrendsResult } from "@/lib/googleTrends";
+import { timeWindows, TrendData } from "@/data/mockTrends";
+import { categories, starterAnchors } from "@/data/categoryConfig";
+import { runLiveRadar } from "@/lib/radarApi";
 import { toast } from "sonner";
 import { Radar } from "lucide-react";
 
-const allSources = ["Google Trends", "YouTube", "Amazon", "Research", "Regulatory"];
-
-const applyTimeWindowScoring = (trends: TrendData[], windowDays: number): TrendData[] => {
-  return trends.map((t) => {
-    const gtd = t.google_trends_data;
-
-    if (windowDays === 30) {
-      // 30-day: emphasise recent spikes & velocity; RecencyBoost
-      const recentSlice = gtd.slice(-3);
-      const recentAvg = recentSlice.reduce((s, v) => s + v, 0) / (recentSlice.length || 1);
-      const fullAvg = gtd.reduce((s, v) => s + v, 0) / (gtd.length || 1);
-      const recencyBoost = Math.min(((recentAvg - fullAvg) / Math.max(fullAvg, 1)) * 40, 20);
-      const velocityBoost = (t.velocity / 30) * 15;
-      const adjustedScore = Math.round(
-        t.trend_score * 0.65 + velocityBoost + recencyBoost + (t.fad_risk < 25 ? 5 : 0)
-      );
-      return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
-    }
-
-    if (windowDays === 180) {
-      // 180-day: penalise short spikes (SpikePenalty), reward structural durability
-      const firstHalf = gtd.slice(0, Math.ceil(gtd.length / 2));
-      const secondHalf = gtd.slice(Math.ceil(gtd.length / 2));
-      const avgFirst = firstHalf.reduce((s, v) => s + v, 0) / (firstHalf.length || 1);
-      const avgSecond = secondHalf.reduce((s, v) => s + v, 0) / (secondHalf.length || 1);
-      const sustainedGrowth = avgSecond > avgFirst ? (avgSecond - avgFirst) / Math.max(avgFirst, 1) : 0;
-
-      // Spike penalty: high velocity + high fad_risk = penalised
-      const spikePenalty = t.fad_risk > 28 && t.velocity > 22 ? 12 : t.fad_risk > 28 ? 6 : 0;
-      const coherenceBoost = (t.coherence / 20) * 12;
-      const structuralBoost = (t.structural_shift / 100) * 10;
-      const adjustedScore = Math.round(
-        t.trend_score * 0.55 + coherenceBoost + structuralBoost + sustainedGrowth * 15 - spikePenalty
-      );
-      return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
-    }
-
-    // 90-day (default): balanced — slight velocity + coherence mix
-    const velocityComponent = (t.velocity / 30) * 8;
-    const coherenceComponent = (t.coherence / 20) * 7;
-    const adjustedScore = Math.round(t.trend_score * 0.78 + velocityComponent + coherenceComponent);
-    return { ...t, trend_score: Math.min(Math.max(adjustedScore, 10), 99) };
-  });
-};
-
-export interface GoogleTrendsMap {
-  [keyword: string]: GoogleTrendsResult;
-}
+const allSources = ["Google Trends", "YouTube", "Reddit", "Amazon (Beta)"];
 
 const Index = () => {
   const navigate = useNavigate();
-  const [category, setCategory] = useState(categories[0]);
+  const [category, setCategory] = useState<string>(categories[0]);
   const [timeWindow, setTimeWindow] = useState(90);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends"]);
+  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube", "Reddit"]);
   const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
 
   const handleCategoryChange = (v: string) => {
     setCategory(v);
-    toast.success(`Category updated: ${v}`, { duration: 2000 });
+    toast.success(`Category updated: ${v}`, { duration: 1800 });
   };
 
   const handleTimeWindowChange = (v: number) => {
     setTimeWindow(v);
-    toast.success(`Time window updated: ${v} days`, { duration: 2000 });
+    toast.success(`Time window updated: ${timeWindows.find((x) => x.value === v)?.label ?? `${v} days`}`, {
+      duration: 1800,
+    });
   };
 
   const handleToggleSource = (source: string) => {
+    if (source.startsWith("Amazon")) {
+      toast.message("Amazon signal is optional beta and won't block radar runs.", { duration: 2500 });
+    }
     setActiveSources((prev) =>
       prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
     );
@@ -89,70 +47,48 @@ const Index = () => {
     if (activeSources.length === 0) return;
     setIsLoading(true);
     setDataSource(null);
-    const raw = radarDataByCategory[category] || [];
-    const scored = applyTimeWindowScoring(raw, timeWindow);
-    const sorted = [...scored].sort((a, b) => b.trend_score - a.trend_score);
-    const topCount = Math.max(5, Math.min(10, sorted.length));
-    const ranked = sorted.slice(0, topCount);
 
     try {
-      const keywords = ranked.map((t) => t.trend_name);
-      const { results, sample_fallback } = await fetchGoogleTrendsData(keywords, timeWindow);
-
-      const gtMap: GoogleTrendsMap = {};
-      results.forEach((r) => {
-        gtMap[r.keyword] = r;
+      const payload = await runLiveRadar({
+        category,
+        timeframe: timeWindow,
+        limit: 10,
       });
 
-      const updatedTrends = ranked.map((t) => {
-        const gt = gtMap[t.trend_name];
-        if (gt && !gt.sample && gt.velocity_score > 0) {
-          return { ...t, velocity: gt.velocity_score };
-        }
-        return t;
-      });
-
-      updatedTrends.sort((a, b) => b.trend_score - a.trend_score);
-
+      const trends = payload.results as TrendData[];
       const ts = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
       setLastUpdated(ts);
-      setDataSource(sample_fallback ? "sample" : "serpapi");
+      setDataSource(payload.liveMode ? "serpapi" : "sample");
       setIsLoading(false);
 
       navigate("/radar", {
         state: {
-          trends: updatedTrends,
-          googleTrendsMap: gtMap,
-          sampleFallback: sample_fallback,
-          dataSource: sample_fallback ? "sample" : "serpapi",
+          trends,
           category,
           timeWindow,
           lastUpdated: ts,
           activeSources,
+          sampleFallback: !payload.liveMode,
+          dataSource: payload.liveMode ? "serpapi" : "sample",
+          partialData: payload.partialData,
+          partialDataSources: payload.partialDataSources,
+          discoveryCount: payload.discoveryCount,
         },
       });
-    } catch {
-      const ts = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-      setLastUpdated(ts);
+
+      if (payload.partialData) {
+        toast.info(`Partial data: ${payload.partialDataSources.join(", ")}.`, { duration: 5000 });
+      }
+
+      if (!payload.liveMode) {
+        toast.info("Demo mode: API keys missing. Add SERPAPI_API_KEY and YOUTUBE_API_KEY for full live discovery.", {
+          duration: 6000,
+        });
+      }
+    } catch (error: any) {
+      setIsLoading(false);
       setDataSource("sample");
-      setIsLoading(false);
-
-      navigate("/radar", {
-        state: {
-          trends: ranked,
-          googleTrendsMap: {},
-          sampleFallback: true,
-          dataSource: "sample",
-          category,
-          timeWindow,
-          lastUpdated: ts,
-          activeSources,
-        },
-      });
-
-      toast.info("Using sample trends data — add SERPAPI_KEY for live Google Trends.", {
-        duration: 6000,
-      });
+      toast.error(error?.message || "Radar failed. Check API routes and environment keys.");
     }
   };
 
@@ -196,10 +132,10 @@ const Index = () => {
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-8">
             <div className="max-w-lg space-y-3">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight tracking-tight">
-                Detect emerging wellness trends before they go mainstream
+                Real trend discovery for Indian wellness categories
               </h2>
               <p className="text-base text-muted-foreground leading-relaxed">
-                Scan real-time signals across multiple sources, score opportunities, and generate actionable founder briefs.
+                We discover related rising queries from starter anchors, score them across Google Trends, YouTube, and Reddit, and return founder-ready trend picks.
               </p>
             </div>
 
@@ -216,15 +152,14 @@ const Index = () => {
                   <Radar size={28} className="text-primary" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-foreground mb-3">Ready to scan</h3>
+              <h3 className="text-lg font-bold text-foreground mb-3">Ready to discover</h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                Pick a category + time window, select your sources, then hit{" "}
-                <span className="text-primary font-medium">Run Radar</span> to generate
-                5–10 opportunity briefs.
+                Select category + timeframe and run radar. The system scans 6 starter anchors and expands into live candidates automatically.
               </p>
-              <p className="text-xs text-muted-foreground/50 mt-5 font-mono">
-                Last scan: {lastUpdated ?? "—"}
+              <p className="text-xs text-muted-foreground/60 mt-4">
+                Starter anchors: {starterAnchors[category as keyof typeof starterAnchors].join(", ")}
               </p>
+              <p className="text-xs text-muted-foreground/50 mt-4 font-mono">Last scan: {lastUpdated ?? "-"}</p>
             </div>
 
             <HowItWorks />

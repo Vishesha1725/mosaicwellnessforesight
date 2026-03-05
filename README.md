@@ -1,73 +1,66 @@
-# Welcome to your Lovable project
+# Mosaic Foresight Engine
 
-## Project info
+Live trend discovery radar for India-focused wellness categories.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Fixed Categories
+- Wellness & Supplements
+- Functional Beverages
+- Beauty & Personal Care
+- Healthy Snacking
+- Mental Health & Sleep
+- Sports Nutrition
 
-## How can I edit this code?
+## How Discovery Works
+1. Each category starts from 6 starter anchors.
+2. Radar calls Google Trends related queries (rising + top) for those anchors.
+3. It merges, cleans, lowercases, and deduplicates candidates.
+4. It scores top candidates using Google Trends + YouTube + Reddit.
+5. It returns 5-10 ranked trends with founder memos and proof.
 
-There are several ways of editing your application.
+## Scoring (Simple)
+- How fast it's growing: Google slope + growth %.
+- Will it last: consistency minus spikeiness.
+- Creator momentum: recent YouTube publishing density.
+- People talking: Reddit discussion proxy.
+- Money potential (INR): category baseline + growth signal.
+- Final score gives extra weight to durability.
 
-**Use Lovable**
+Classification:
+- REAL TREND: durable + strong growth/momentum + at least 2 strong sources.
+- FAD: spiky OR only one source is strong.
+- EARLY SIGNAL: in-between.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## API Routes
+Vercel server routes:
+- `api/signal/google-trends.ts`
+- `api/signal/youtube.ts`
+- `api/signal/reddit.ts`
+- `api/radar/run.ts`
 
-Changes made via Lovable will be committed automatically to this repo.
+Next.js App Router-compatible mirrors:
+- `app/api/signal/google-trends/route.ts`
+- `app/api/signal/youtube/route.ts`
+- `app/api/signal/reddit/route.ts`
+- `app/api/radar/run/route.ts`
 
-**Use your preferred IDE**
+All routes use 10-minute in-memory caching per keyword + timeframe.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Environment Variables
+Set these in Vercel Project Settings -> Environment Variables:
+- `SERPAPI_API_KEY`
+- `YOUTUBE_API_KEY`
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Optional/fallback support:
+- `SERPAPI_KEY` is also accepted.
+- Amazon is kept optional beta and does not block runs.
 
-Follow these steps:
-
+## Local Run
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Notes
+- `.env.local` is ignored and must never be committed.
+- Demo mode appears only when required API keys are missing or a source fails.
+- Partial-data runs still return results and show a small note in UI.

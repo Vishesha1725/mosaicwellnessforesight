@@ -1,40 +1,62 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import RadarHeader from "@/components/RadarHeader";
-import TopOpportunity from "@/components/TopOpportunity";
-import TrendCard from "@/components/TrendCard";
 import TrendPanel from "@/components/TrendPanel";
 import { TrendData } from "@/data/mockTrends";
 import { timeWindows } from "@/data/mockTrends";
-import { GoogleTrendsMap } from "@/pages/Index";
 
 interface RadarState {
   trends: TrendData[];
-  googleTrendsMap: GoogleTrendsMap;
   sampleFallback: boolean;
   dataSource: "serpapi" | "sample";
   category: string;
   timeWindow: number;
   lastUpdated: string;
   activeSources: string[];
+  partialData?: boolean;
+  partialDataSources?: string[];
+  discoveryCount?: number;
 }
+
+const badgeClass: Record<string, string> = {
+  "REAL TREND": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "EARLY SIGNAL": "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  FAD: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+};
+
+const placeholderGradients = [
+  "linear-gradient(135deg, hsl(190 55% 28%) 0%, hsl(220 35% 18%) 100%)",
+  "linear-gradient(135deg, hsl(150 40% 26%) 0%, hsl(180 30% 16%) 100%)",
+  "linear-gradient(135deg, hsl(340 35% 30%) 0%, hsl(220 30% 16%) 100%)",
+  "linear-gradient(135deg, hsl(32 55% 32%) 0%, hsl(10 35% 18%) 100%)",
+];
 
 const RadarResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as RadarState | null;
-  const [selectedTrend, setSelectedTrend] = useState<TrendData | null>(null);
+  const [selected, setSelected] = useState<{ trend: TrendData; tab: "memo" | "proof" } | null>(null);
 
   useEffect(() => {
-    if (!state) {
-      navigate("/", { replace: true });
-    }
+    if (!state) navigate("/", { replace: true });
   }, [state, navigate]);
 
   if (!state) return null;
 
-  const { trends, googleTrendsMap, sampleFallback, dataSource, category, timeWindow, lastUpdated, activeSources } = state;
-  const topTrend = trends.length > 0 ? trends[0] : null;
+  const {
+    trends,
+    sampleFallback,
+    dataSource,
+    category,
+    timeWindow,
+    lastUpdated,
+    activeSources,
+    partialData,
+    partialDataSources,
+    discoveryCount,
+  } = state;
+
+  const topPicks = useMemo(() => trends.slice(0, 5), [trends]);
   const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow} Days`;
 
   return (
@@ -45,16 +67,7 @@ const RadarResults = () => {
           "linear-gradient(135deg, hsl(220 20% 6%) 0%, hsl(220 22% 8%) 40%, hsl(240 15% 10%) 100%)",
       }}
     >
-      <div
-        className="pointer-events-none fixed inset-0"
-        aria-hidden
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 30% 20%, hsl(190 50% 25% / 0.12) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 70% 60%, hsl(260 30% 25% / 0.08) 0%, transparent 70%)",
-        }}
-      />
-
-      <div className="relative z-10 max-w-5xl mx-auto space-y-6">
+      <div className="relative z-10 max-w-6xl mx-auto space-y-6">
         <RadarHeader
           category={category}
           timeWindow={timeWindow}
@@ -67,74 +80,120 @@ const RadarResults = () => {
           showControls={false}
         />
 
-        {/* Scan Config Summary */}
         <div className="glass-card px-5 py-3 flex items-center gap-4 flex-wrap text-xs">
-          <span className="text-muted-foreground font-medium">Scan Config:</span>
+          <span className="text-muted-foreground font-medium">Scan:</span>
           <span className="text-foreground font-semibold">{category}</span>
-          <span className="text-border">·</span>
+          <span className="text-border">-</span>
           <span className="text-foreground">{windowLabel}</span>
-          <span className="text-border">·</span>
-          <span className="text-muted-foreground">Scored on: <span className="text-foreground font-semibold">{timeWindow} days</span></span>
-          <span className="text-border">·</span>
+          <span className="text-border">-</span>
+          <span className="text-muted-foreground">Candidates discovered: <span className="text-foreground font-semibold">{discoveryCount ?? trends.length}</span></span>
+          <span className="text-border">-</span>
           <span className="text-muted-foreground">Signals:</span>
           {activeSources.map((s) => (
             <span key={s} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">
               {s}
             </span>
           ))}
-          <button
-            onClick={() => navigate("/")}
-            className="ml-auto text-primary hover:text-primary/80 font-medium transition-colors"
-          >
-            ← New Scan
+          <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">
+            {"\u2190"} New Scan
           </button>
         </div>
 
         {sampleFallback && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 text-sm text-amber-300 flex items-center gap-3">
-            <span className="text-lg">⚠️</span>
-            <div>
-              <span className="font-semibold text-amber-200">Demo mode:</span>{" "}
-              <span>Live data unavailable (API error / quota). Showing sample trends data.</span>
-            </div>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 text-sm text-amber-300">
+            Demo mode active: API keys are missing, so live discovery is limited.
           </div>
         )}
 
-        {topTrend && (
-          <>
-            <TopOpportunity
-              trend={topTrend}
-              onViewBrief={() => setSelectedTrend(topTrend)}
-              googleTrends={googleTrendsMap[topTrend.trend_name]}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {trends.slice(1).map((trend, i) => (
-                <TrendCard
-                  key={trend.id}
-                  trend={trend}
-                  rank={i + 2}
-                  onClick={() => setSelectedTrend(trend)}
-                  googleTrends={googleTrendsMap[trend.trend_name]}
-                />
-              ))}
-            </div>
-          </>
+        {partialData && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl px-5 py-4 text-sm text-yellow-200">
+            Partial data: {partialDataSources?.join(", ")}
+          </div>
         )}
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-foreground">Top Picks (5)</h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {topPicks.map((trend, idx) => (
+              <article key={trend.id || `${trend.trend_name}-${idx}`} className="rounded-2xl bg-card/80 border border-border overflow-hidden">
+                {trend.thumbnail_url ? (
+                  <img src={trend.thumbnail_url} alt={trend.trend_name} className="w-full h-36 object-cover" />
+                ) : (
+                  <div className="h-36" style={{ background: placeholderGradients[idx % placeholderGradients.length] }} />
+                )}
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-foreground leading-tight">{trend.trend_name}</h3>
+                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>
+                      {trend.classification || "EARLY SIGNAL"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="glass-card p-2">
+                      <p className="text-[10px] text-muted-foreground">Growing</p>
+                      <p className="text-sm font-semibold text-foreground">{trend.how_fast_its_growing ?? 0}</p>
+                    </div>
+                    <div className="glass-card p-2">
+                      <p className="text-[10px] text-muted-foreground">Will Last</p>
+                      <p className="text-sm font-semibold text-foreground">{trend.will_it_last ?? 0}</p>
+                    </div>
+                    <div className="glass-card p-2">
+                      <p className="text-[10px] text-muted-foreground">Money (INR)</p>
+                      <p className="text-sm font-semibold text-foreground">{trend.money_potential ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelected({ trend, tab: "memo" })}
+                      className="flex-1 rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2 text-xs font-semibold"
+                    >
+                      Founder Memo
+                    </button>
+                    <button
+                      onClick={() => setSelected({ trend, tab: "proof" })}
+                      className="flex-1 rounded-lg border border-border bg-secondary/40 text-foreground px-3 py-2 text-xs font-semibold"
+                    >
+                      See Proof
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3 pb-10">
+          <h2 className="text-lg font-bold text-foreground">By Category Results</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {trends.map((trend, idx) => (
+              <div key={`${trend.id}-${idx}`} className="glass-card p-4 flex items-start gap-3">
+                <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden" style={!trend.thumbnail_url ? { background: placeholderGradients[idx % placeholderGradients.length] } : undefined}>
+                  {trend.thumbnail_url && <img src={trend.thumbnail_url} alt={trend.trend_name} className="w-full h-full object-cover" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-sm text-foreground truncate">{trend.trend_name}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>
+                      {trend.classification || "EARLY SIGNAL"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Score {trend.trend_score}/100</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button onClick={() => setSelected({ trend, tab: "memo" })} className="text-xs text-primary font-medium">Founder Memo</button>
+                    <span className="text-muted-foreground text-xs">|</span>
+                    <button onClick={() => setSelected({ trend, tab: "proof" })} className="text-xs text-primary font-medium">See Proof</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
-      {selectedTrend && (
+      {selected && (
         <>
-          <div
-            className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 animate-fade-in"
-            onClick={() => setSelectedTrend(null)}
-          />
-          <TrendPanel
-            trend={selectedTrend}
-            category={category}
-            onClose={() => setSelectedTrend(null)}
-            googleTrends={googleTrendsMap[selectedTrend.trend_name]}
-          />
+          <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 animate-fade-in" onClick={() => setSelected(null)} />
+          <TrendPanel trend={selected.trend} category={category} onClose={() => setSelected(null)} defaultTab={selected.tab} />
         </>
       )}
     </div>

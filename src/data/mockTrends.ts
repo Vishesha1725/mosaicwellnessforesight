@@ -1,7 +1,22 @@
+import { categories } from "./categoryConfig";
+
 export interface TrendData {
   id: string;
   trend_name: string;
   trend_score: number;
+  category?: string;
+  classification?: "REAL TREND" | "EARLY SIGNAL" | "FAD";
+  how_fast_its_growing?: number;
+  will_it_last?: number;
+  money_potential?: number;
+  creator_momentum?: number;
+  people_talking?: number;
+  why_bullets?: string[];
+  thumbnail_url?: string;
+  youtube_titles?: string[];
+  youtube_counts?: { d7: number; d30: number; d90: number };
+  reddit_counts?: { d30: number; d90: number };
+  partial_data_note?: string;
   velocity: number;
   coherence: number;
   competition: number;
@@ -23,17 +38,9 @@ export interface TrendData {
   evidence_snippets: string[];
 }
 
-export const categories = [
-  "Wellness & Supplements",
-  "Functional Beverages",
-  "Beauty & Personal Care",
-  "Healthy Snacking",
-  "Mental Health & Sleep",
-  "Sports Nutrition",
-];
-
 export const timeWindows = [
+  { label: "7 Days", value: 7 },
   { label: "30 Days", value: 30 },
   { label: "90 Days", value: 90 },
-  { label: "180 Days", value: 180 },
+  { label: "12 Months", value: 365 },
 ];
