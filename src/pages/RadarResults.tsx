@@ -23,6 +23,7 @@ const badgeClass: Record<string, string> = {
   "REAL TREND": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   "EARLY SIGNAL": "bg-sky-500/15 text-sky-300 border-sky-500/30",
   FAD: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "NO DATA": "bg-slate-500/20 text-slate-200 border-slate-400/30",
 };
 
 const placeholderGradients = [
@@ -33,6 +34,7 @@ const placeholderGradients = [
 ];
 
 const metric = (v: number | null | undefined) => (typeof v === "number" ? v : "--");
+const badgeText = (t: TrendData) => (t.proof_status ? "NO DATA" : t.classification || "EARLY SIGNAL");
 
 const RadarResults = () => {
   const location = useLocation();
@@ -113,13 +115,14 @@ const RadarResults = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-foreground leading-tight">{cleanText(trend.trend_name)}</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>{trend.classification || "EARLY SIGNAL"}</span>
+                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Growing</p><p className="text-sm font-semibold text-foreground">{metric(trend.how_fast_its_growing)}</p></div>
                     <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Will Last</p><p className="text-sm font-semibold text-foreground">{metric(trend.will_it_last)}</p></div>
-                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Market Strength</p><p className="text-sm font-semibold text-foreground">{metric(trend.market_strength ?? trend.trend_score)}</p></div>
+                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Market Strength</p><p className="text-sm font-semibold text-foreground">{metric(trend.market_strength)}</p></div>
                   </div>
+                  {trend.proof_status && <p className="text-xs text-slate-300">{cleanText(trend.proof_status)}</p>}
                   <div className="glass-card p-2 text-[11px] text-muted-foreground leading-relaxed">
                     <p>TAM: <span className="text-foreground font-semibold">INR {metric(trend.tam_estimate_cr)} Cr (est)</span></p>
                     <p>CAC: <span className="text-foreground font-semibold">INR {metric(trend.cac_estimate_inr)} (est)</span> | ROI: <span className="text-foreground font-semibold">{metric(trend.roi_estimate_x)}x (est)</span></p>
@@ -158,9 +161,9 @@ const RadarResults = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm text-foreground truncate">{cleanText(trend.trend_name)}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>{trend.classification || "EARLY SIGNAL"}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Market Strength {metric(trend.market_strength ?? trend.trend_score)}/100 - TAM INR {metric(trend.tam_estimate_cr)} Cr - ROI {metric(trend.roi_estimate_x)}x</p>
+                  <p className="text-xs text-muted-foreground mt-1">Market Strength {metric(trend.market_strength)}/100 - TAM INR {metric(trend.tam_estimate_cr)} Cr - ROI {metric(trend.roi_estimate_x)}x</p>
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => setSelected({ trend, tab: "memo" })} className="text-xs text-primary font-medium">Founder Memo</button>
                     <span className="text-muted-foreground text-xs">|</span>

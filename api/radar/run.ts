@@ -231,8 +231,14 @@ export default async function handler(req: any, res: any) {
     await Promise.all(
       rows.map((row) =>
         rowLimiter(async () => {
-          const primary = cleanText(String(row.product.keywords?.[0] || "").toLowerCase());
-          const fallbackKeywords = ((row.product.fallbackKeywords as string[] | undefined) || row.product.keywords?.slice(1, 3) || [])
+          const dataKeywords = ((row.product.dataKeywords as string[] | undefined) || row.product.keywords || [])
+            .map((k: string) => cleanText(String(k).toLowerCase()))
+            .filter(Boolean);
+          const primary = cleanText(String(dataKeywords[0] || "").toLowerCase());
+          const fallbackKeywords = [
+            ...dataKeywords.slice(1),
+            ...(((row.product.fallbackKeywords as string[] | undefined) || []) as string[]),
+          ]
             .map((k: string) => cleanText(String(k).toLowerCase()))
             .filter(Boolean);
 
@@ -341,38 +347,11 @@ export default async function handler(req: any, res: any) {
 
           if (!trendsValid && !youtubeValid && !redditValid) {
             row.sourcesUsed = [];
-            row.proofStatus = "Not enough public signal yet";
+            row.proofStatus = "Not enough public signal for this phrasing yet";
           }
         })
       )
     );
-
-    const noPrimaryCoverage = rows.every((r) => !r.sourcesUsed.includes("trends") && !r.sourcesUsed.includes("youtube"));
-    if (noPrimaryCoverage) {
-      const sample = getSampleTrends(category).slice(0, 8).map((x) => ({
-        ...x,
-        trend_name: cleanText(x.trend_name),
-        image_data_uri: svgDataUriForProduct(cleanText(x.trend_name), category),
-        thumbnail_url: svgDataUriForProduct(cleanText(x.trend_name), category),
-      }));
-      timingsMs.total = Date.now() - t0;
-      res.status(200).json({
-        mode: "demo",
-        reason: "Both Google Trends and YouTube signals unavailable",
-        category,
-        timeframeDays,
-        candidatesDiscovered: 8,
-        signalsUsed: ["Google Trends", "YouTube", "Reddit"],
-        topPicks: sample.slice(0, 5),
-        results: sample,
-        partialData: true,
-        partialDataSources: ["Google Trends", "YouTube"],
-        liveMode: false,
-        discoveryCount: 8,
-        timingsMs,
-      });
-      return;
-    }
 
     const results = rows.map((row) => {
       const hasTrends = row.sourcesUsed.includes("trends");
@@ -388,13 +367,16 @@ export default async function handler(req: any, res: any) {
         hasReddit,
       });
 
-      const classification = classifyTrend({
-        marketStrength: dynamic.marketStrength,
-        willLastScore: dynamic.willLastScore,
-        growingScore: dynamic.growingScore,
-        spikeiness: row.google.spikeiness,
-        strongSourceCount: dynamic.strongSourceCount,
-      });
+      const noSignal = !hasTrends && !hasYoutube && !hasReddit;
+      const classification = noSignal
+        ? "EARLY SIGNAL"
+        : classifyTrend({
+            marketStrength: dynamic.marketStrength,
+            willLastScore: dynamic.willLastScore,
+            growingScore: dynamic.growingScore,
+            spikeiness: row.google.spikeiness,
+            strongSourceCount: dynamic.strongSourceCount,
+          });
 
       const tamEstimateCr = Math.round((BASELINE_TAM[category] || 400) * (0.6 + dynamic.marketStrength / 200));
       const competitionFactor = row.youtube.totalResults
@@ -428,18 +410,18 @@ export default async function handler(req: any, res: any) {
         id: row.product.id,
         category,
         trend_name: cleanText(row.product.name),
-        trend_score: dynamic.marketStrength,
-        market_strength: dynamic.marketStrength,
+        trend_score: noSignal ? 0 : dynamic.marketStrength,
+        market_strength: noSignal ? null : dynamic.marketStrength,
         classification,
-        how_fast_its_growing: hasTrends || hasYoutube || hasReddit ? dynamic.growingScore : null,
-        will_it_last: hasTrends || hasYoutube || hasReddit ? dynamic.willLastScore : null,
-        money_potential: dynamic.marketStrength,
+        how_fast_its_growing: noSignal ? null : dynamic.growingScore,
+        will_it_last: noSignal ? null : dynamic.willLastScore,
+        money_potential: noSignal ? null : dynamic.marketStrength,
         creator_momentum: hasYoutube ? dynamic.ytMomentum : null,
         people_talking: hasReddit ? dynamic.redditBuzz : null,
-        tam_estimate_cr: tamEstimateCr,
-        cac_estimate_inr: cacEstimateInr,
-        roi_estimate_x: roiX,
-        fad_risk_label: fadRiskLabel,
+        tam_estimate_cr: noSignal ? null : tamEstimateCr,
+        cac_estimate_inr: noSignal ? null : cacEstimateInr,
+        roi_estimate_x: noSignal ? null : roiX,
+        fad_risk_label: noSignal ? "Medium" : fadRiskLabel,
         formats: row.formats.map((f) => cleanText(f)),
         pricing: row.pricing,
         image_data_uri: svgDataUriForProduct(cleanText(row.product.name), category),
@@ -472,9 +454,14 @@ export default async function handler(req: any, res: any) {
         google_trends_data: row.google.series,
         evidence_snippets: [memo.proof, ...memo.whyRealOrFad].map((x: string) => cleanText(x)),
         partial_data_note: "Full scan: Google Trends + YouTube (may take longer)",
-        proof_status: row.proofStatus,
+        proof_status: row.proofStatus || (noSignal ? "Not enough public signal for this phrasing yet" : undefined),
         sourcesUsed: row.sourcesUsed,
         keyword_used: {
+          trends: row.google.keywordUsed || null,
+          youtube: row.youtube.keywordUsed || null,
+          reddit: row.reddit.keywordUsed || null,
+        },
+        queryUsed: {
           trends: row.google.keywordUsed || null,
           youtube: row.youtube.keywordUsed || null,
           reddit: row.reddit.keywordUsed || null,
@@ -491,9 +478,9 @@ export default async function handler(req: any, res: any) {
         trendsSparklinePointsCount: hasTrends ? row.google.series.length : null,
         youtubeRecentCount: hasYoutube ? row.youtube.recentCount : null,
         timings_ms: row.sourceTimingsMs,
-        velocity: clamp(Math.round((dynamic.growingScore || 0) / 3.3), 0, 30),
-        coherence: clamp(Math.round((dynamic.willLastScore || 0) / 5), 0, 20),
-        competition: clamp(15 - Math.round((dynamic.ytMomentum || 0) / 10), 1, 15),
+        velocity: noSignal ? 0 : clamp(Math.round((dynamic.growingScore || 0) / 3.3), 0, 30),
+        coherence: noSignal ? 0 : clamp(Math.round((dynamic.willLastScore || 0) / 5), 0, 20),
+        competition: noSignal ? 15 : clamp(15 - Math.round((dynamic.ytMomentum || 0) / 10), 1, 15),
         entry_window: classification === "REAL TREND" ? "Early" : classification === "EARLY SIGNAL" ? "Optimal" : "Late",
         dominance_prob: clamp(Math.round(dynamic.marketStrength * 0.9), 0, 100),
         feasibility: clamp(Math.round(65 + dynamic.marketStrength * 0.2), 0, 100),
@@ -510,7 +497,7 @@ export default async function handler(req: any, res: any) {
       };
     });
 
-    results.sort((a, b) => b.market_strength - a.market_strength);
+    results.sort((a, b) => (Number(b.market_strength ?? -1) - Number(a.market_strength ?? -1)));
     const sliced = results.slice(0, Math.min(limit, 8));
 
     timingsMs.total = Date.now() - t0;

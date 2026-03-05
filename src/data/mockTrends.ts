@@ -14,10 +14,10 @@ export interface TrendData {
   why_bullets?: string[];
   thumbnail_url?: string;
   image_data_uri?: string;
-  market_strength?: number;
-  tam_estimate_cr?: number;
-  cac_estimate_inr?: number;
-  roi_estimate_x?: number;
+  market_strength?: number | null;
+  tam_estimate_cr?: number | null;
+  cac_estimate_inr?: number | null;
+  roi_estimate_x?: number | null;
   fad_risk_label?: "Low" | "Medium" | "High";
   formats?: string[];
   pricing?: { trial: [number, number]; monthly: [number, number]; bundle: [number, number] };
@@ -41,6 +41,7 @@ export interface TrendData {
     sparklinePoints?: number | null;
   };
   keyword_used?: { trends?: string | null; youtube?: string | null; reddit?: string | null };
+  queryUsed?: { trends?: string | null; youtube?: string | null; reddit?: string | null };
   proof_status?: string;
   trendsGrowthPct?: number | null;
   trendsSparklinePointsCount?: number | null;

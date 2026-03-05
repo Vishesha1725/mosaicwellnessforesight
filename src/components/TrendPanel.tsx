@@ -12,6 +12,7 @@ interface TrendPanelProps {
 }
 
 const metric = (v: number | null | undefined) => (typeof v === "number" ? v : "--");
+const badgeText = (t: TrendData) => (t.proof_status ? "NO DATA" : (t.classification || "EARLY SIGNAL"));
 
 const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPanelProps) => {
   const [tab, setTab] = useState<"memo" | "proof">(defaultTab);
@@ -34,7 +35,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
         <div>
           <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{category}</p>
           <h2 className="text-base font-bold text-foreground mt-1">{cleanText(trend.trend_name)}</h2>
-          <p className="text-xs mt-1 text-primary font-semibold">{trend.classification || "EARLY SIGNAL"}</p>
+          <p className="text-xs mt-1 text-primary font-semibold">{badgeText(trend)}</p>
         </div>
         <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
           <X size={16} />
@@ -69,7 +70,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Core Metrics</p>
               <p className="text-sm text-foreground">How fast it's growing: <span className="font-semibold">{metric(trend.how_fast_its_growing)}/100</span></p>
               <p className="text-sm text-foreground">Will it last: <span className="font-semibold">{metric(trend.will_it_last)}/100</span></p>
-              <p className="text-sm text-foreground">Market strength: <span className="font-semibold">{metric(trend.market_strength ?? trend.trend_score)}/100</span></p>
+              <p className="text-sm text-foreground">Market strength: <span className="font-semibold">{metric(trend.market_strength)}/100</span></p>
               <p className="text-sm text-foreground">TAM: <span className="font-semibold">INR {metric(trend.tam_estimate_cr)} Cr (est)</span></p>
               <p className="text-sm text-foreground">CAC: <span className="font-semibold">INR {metric(trend.cac_estimate_inr)} (est)</span> | ROI: <span className="font-semibold">{metric(trend.roi_estimate_x)}x</span></p>
               <p className="text-sm text-foreground">Fad Risk: <span className="font-semibold">{trend.fad_risk_label ?? "Medium"}</span></p>
@@ -90,7 +91,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
             <div className="glass-card p-4">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Google Trends (India)</p>
               {timeline.length > 0 ? <Sparkline data={timeline} height={54} /> : <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
-              <p className="text-xs text-secondary-foreground mt-2">Keyword used: {trend.keyword_used?.trends || "--"}</p>
+              <p className="text-xs text-secondary-foreground mt-2">Keyword used: {trend.queryUsed?.trends || trend.keyword_used?.trends || "--"}</p>
             </div>
 
             <div className="glass-card p-4 space-y-2">
@@ -100,7 +101,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               {(trend.youtube_titles || []).slice(0, 2).map((title, idx) => (
                 <p key={`${title}-${idx}`} className="text-xs text-secondary-foreground">- {cleanText(title)}</p>
               ))}
-              <p className="text-xs text-secondary-foreground">Keyword used: {trend.keyword_used?.youtube || "--"}</p>
+              <p className="text-xs text-secondary-foreground">Keyword used: {trend.queryUsed?.youtube || trend.keyword_used?.youtube || "--"}</p>
             </div>
 
             <div className="glass-card p-4 space-y-2">
@@ -108,7 +109,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               <p className="text-sm text-foreground">Posts in 30d: <span className="font-semibold">{metric(trend.reddit_counts?.d30)}</span></p>
               <p className="text-sm text-foreground">Posts in 90d: <span className="font-semibold">{metric(trend.reddit_counts?.d90)}</span></p>
               {trend.reddit_counts?.d30 == null && trend.reddit_counts?.d90 == null && <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
-              <p className="text-xs text-secondary-foreground">Keyword used: {trend.keyword_used?.reddit || "--"}</p>
+              <p className="text-xs text-secondary-foreground">Keyword used: {trend.queryUsed?.reddit || trend.keyword_used?.reddit || "--"}</p>
             </div>
 
             {!!trend.formats?.length && (
@@ -124,7 +125,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
             )}
 
             <div className="glass-card p-4 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Why this is {trend.classification || "EARLY SIGNAL"}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Why this is {badgeText(trend)}</p>
               {(trend.why_bullets || []).slice(0, 3).map((bullet, idx) => (
                 <p key={`${bullet}-${idx}`} className="text-xs text-secondary-foreground">- {cleanText(bullet)}</p>
               ))}
