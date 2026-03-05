@@ -1,6 +1,6 @@
-import { validateKeys } from "./env";
-import { fetchGoogleTrends } from "./googleTrends";
-import { fetchYoutubeVideos } from "./youtube";
+import { validateKeys } from "./env.js";
+import { fetchGoogleTrends } from "./googleTrends.js";
+import { fetchYoutubeVideos } from "./youtube.js";
 
 export type CategoryName =
   | "Wellness & Supplements"
