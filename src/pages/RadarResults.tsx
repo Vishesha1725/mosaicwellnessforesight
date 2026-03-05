@@ -131,6 +131,7 @@ const RadarResults = () => {
           />
           <TrendPanel
             trend={selectedTrend}
+            category={category}
             onClose={() => setSelectedTrend(null)}
             googleTrends={googleTrendsMap[selectedTrend.trend_name]}
           />

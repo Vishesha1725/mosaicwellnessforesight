@@ -7,9 +7,11 @@ import EntryBadge from "./EntryBadge";
 import Sparkline from "./Sparkline";
 import { GoogleTrendsResult } from "@/lib/googleTrends";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { categoryFormatIdeas } from "@/data/radarDataByCategory";
 
 interface TrendPanelProps {
   trend: TrendData;
+  category: string;
   onClose: () => void;
   googleTrends?: GoogleTrendsResult;
 }
@@ -23,10 +25,11 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "brief", label: "Founder Brief" },
 ];
 
-const TrendPanel = ({ trend, onClose, googleTrends }: TrendPanelProps) => {
+const TrendPanel = ({ trend, category, onClose, googleTrends }: TrendPanelProps) => {
   const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [copied, setCopied] = useState(false);
   const hasGT = googleTrends && googleTrends.timeline.length > 0;
+  const formatIdeas = categoryFormatIdeas[category] ?? [];
 
   const chartData = trend.google_trends_data.map((v, i) => ({
     month: `M${i + 1}`,
@@ -163,6 +166,12 @@ const TrendPanel = ({ trend, onClose, googleTrends }: TrendPanelProps) => {
 
         {activeTab === "market" && (
           <>
+            {formatIdeas.length > 0 && (
+              <div className="glass-card p-4">
+                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Founder Format Ideas</h4>
+                <p className="text-sm text-foreground">{formatIdeas.join(" / ")}</p>
+              </div>
+            )}
             {[
               { label: "Price Ladder", value: trend.price_ladder },
               { label: "Format", value: trend.format_recommendation },

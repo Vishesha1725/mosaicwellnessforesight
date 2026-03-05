@@ -92,9 +92,11 @@ const Index = () => {
     const raw = radarDataByCategory[category] || [];
     const scored = applyTimeWindowScoring(raw, timeWindow);
     const sorted = [...scored].sort((a, b) => b.trend_score - a.trend_score);
+    const topCount = Math.max(5, Math.min(10, sorted.length));
+    const ranked = sorted.slice(0, topCount);
 
     try {
-      const keywords = sorted.map((t) => t.trend_name);
+      const keywords = ranked.map((t) => t.trend_name);
       const { results, sample_fallback } = await fetchGoogleTrendsData(keywords, timeWindow);
 
       const gtMap: GoogleTrendsMap = {};
@@ -102,7 +104,7 @@ const Index = () => {
         gtMap[r.keyword] = r;
       });
 
-      const updatedTrends = sorted.map((t) => {
+      const updatedTrends = ranked.map((t) => {
         const gt = gtMap[t.trend_name];
         if (gt && !gt.sample && gt.velocity_score > 0) {
           return { ...t, velocity: gt.velocity_score };
@@ -137,7 +139,7 @@ const Index = () => {
 
       navigate("/radar", {
         state: {
-          trends: sorted,
+          trends: ranked,
           googleTrendsMap: {},
           sampleFallback: true,
           dataSource: "sample",
