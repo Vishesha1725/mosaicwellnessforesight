@@ -62,6 +62,14 @@ const RadarResults = () => {
 
   const topPicks = useMemo(() => trends.slice(0, 5), [trends]);
   const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow} Days`;
+  const coverage = useMemo(
+    () => ({
+      trends: trends.some((t) => t.sourcesUsed?.includes("trends")),
+      youtube: trends.some((t) => t.sourcesUsed?.includes("youtube")),
+      reddit: trends.some((t) => t.sourcesUsed?.includes("reddit")),
+    }),
+    [trends]
+  );
 
   return (
     <div
@@ -110,6 +118,10 @@ const RadarResults = () => {
               <span className="text-muted-foreground">Run: <span className="text-foreground font-semibold">{timingsMs.total}ms</span></span>
             </>
           )}
+          <span className="text-border">-</span>
+          <span className="text-muted-foreground">
+            Live data used: Trends {coverage.trends ? "✅" : "❌"} YouTube {coverage.youtube ? "✅" : "❌"} Reddit {coverage.reddit ? "✅" : "❌"}
+          </span>
           <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">
             {"\u2190"} New Scan
           </button>

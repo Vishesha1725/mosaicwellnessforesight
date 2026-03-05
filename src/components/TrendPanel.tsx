@@ -137,6 +137,16 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               ))}
             </div>
 
+            <div className="glass-card p-4 space-y-2">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Raw Signals</p>
+              <p className="text-xs text-secondary-foreground">Sources used: {(trend.sourcesUsed || []).join(", ") || "none"}</p>
+              <p className="text-xs text-secondary-foreground">Growth %: {trend.rawSignals?.growthPct ?? 0}</p>
+              <p className="text-xs text-secondary-foreground">Spikeiness: {trend.rawSignals?.spikeiness ?? 0}</p>
+              <p className="text-xs text-secondary-foreground">YouTube recent count: {trend.rawSignals?.ytRecentCount ?? 0}</p>
+              <p className="text-xs text-secondary-foreground">Reddit mentions: {trend.rawSignals?.redditMentions ?? 0}</p>
+              <p className="text-xs text-secondary-foreground">Timings (ms): Trends {trend.timings_ms?.trends ?? 0}, YouTube {trend.timings_ms?.youtube ?? 0}, Reddit {trend.timings_ms?.reddit ?? 0}</p>
+            </div>
+
             {trend.partial_data_note && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-xs text-amber-200">
                 {trend.partial_data_note}

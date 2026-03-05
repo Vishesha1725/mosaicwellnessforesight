@@ -31,6 +31,14 @@ export interface TrendData {
     risksAndFixes: string[];
     ninetyDayPlan: string;
   };
+  sourcesUsed?: string[];
+  rawSignals?: {
+    growthPct: number;
+    spikeiness: number;
+    ytRecentCount: number;
+    redditMentions: number;
+  };
+  timings_ms?: { trends: number; youtube: number; reddit: number };
   one_liner?: string;
   keywords?: string[];
   youtube_titles?: string[];

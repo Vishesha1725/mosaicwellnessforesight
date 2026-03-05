@@ -4,7 +4,6 @@ import { fetchGoogleRelatedQueries, fetchGoogleTrendsSignal } from "../_lib/sign
 import { fetchYoutubeSignal } from "../_lib/signals/youtube.js";
 import { fetchRedditSignal } from "../_lib/signals/reddit.js";
 import { buildPricingAndFormats } from "../_lib/pricing.js";
-import { scoreProduct } from "../_lib/scoring.js";
 import { buildFounderMemo } from "../_lib/founderMemo.js";
 import { svgDataUriForProduct } from "../_lib/imageSvg.js";
 import { getSampleTrends } from "../_lib/sampleTrends.js";
@@ -32,9 +31,7 @@ function pLimit(limit: number) {
     if (fn) fn();
   };
   return async function run<T>(task: () => Promise<T>): Promise<T> {
-    if (active >= limit) {
-      await new Promise<void>((resolve) => queue.push(resolve));
-    }
+    if (active >= limit) await new Promise<void>((resolve) => queue.push(resolve));
     active += 1;
     try {
       return await task();
@@ -43,6 +40,121 @@ function pLimit(limit: number) {
     }
   };
 }
+
+function getWindowDays(timeframeDays: number) {
+  if (timeframeDays >= 180) return 90;
+  if (timeframeDays >= 60) return 30;
+  return 7;
+}
+
+function mean(values: number[]) {
+  if (!values.length) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function std(values: number[]) {
+  if (values.length < 2) return 0;
+  const m = mean(values);
+  return Math.sqrt(values.reduce((acc, v) => acc + (v - m) ** 2, 0) / values.length);
+}
+
+function classifyTrend(input: {
+  marketStrength: number;
+  willLastScore: number;
+  growingScore: number;
+  spikeiness: number;
+  strongSourceCount: number;
+}) {
+  const { marketStrength, willLastScore, growingScore, spikeiness, strongSourceCount } = input;
+
+  if (marketStrength >= 55 && willLastScore >= 50) return "REAL TREND";
+  if (growingScore >= 55 || (marketStrength >= 35 && marketStrength <= 54)) return "EARLY SIGNAL";
+  if ((willLastScore < 30 && growingScore < 35) || (spikeiness >= 88 && strongSourceCount === 0)) return "FAD";
+  return "EARLY SIGNAL";
+}
+
+function computeDynamicScores(params: {
+  google: { series: number[]; growthPct: number; spikeiness: number };
+  youtube: { recentCount: number };
+  reddit: { mentionCount: number };
+  hasTrends: boolean;
+  hasYoutube: boolean;
+  hasReddit: boolean;
+}) {
+  const { google, youtube, reddit, hasTrends, hasYoutube, hasReddit } = params;
+
+  const ytMomentum = clamp(youtube.recentCount * 8, 0, 100);
+  const redditBuzz = clamp(reddit.mentionCount * 8, 0, 100);
+
+  let growingScore = 0;
+  let willLastScore = 0;
+
+  if (hasTrends) {
+    const series = google.series || [];
+    const slope = series.length > 1 ? (series[series.length - 1] - series[0]) / (series.length - 1) : 0;
+    const volatilityPenalty = clamp((std(series) / Math.max(mean(series), 1)) * 55, 0, 45);
+    growingScore = clamp(42 + google.growthPct * 0.55 + slope * 4, 0, 100);
+    willLastScore = clamp(82 - google.spikeiness * 0.55 - volatilityPenalty + Math.max(0, google.growthPct * 0.08), 0, 100);
+  } else if (hasYoutube && hasReddit) {
+    growingScore = clamp(0.6 * ytMomentum + 0.4 * redditBuzz, 0, 100);
+    const stability = 100 - Math.abs(ytMomentum - redditBuzz);
+    willLastScore = clamp(50 + stability * 0.25 - 10, 20, 85);
+  } else if (hasYoutube) {
+    growingScore = ytMomentum;
+    willLastScore = clamp(45 + ytMomentum * 0.25, 25, 80);
+  } else if (hasReddit) {
+    growingScore = redditBuzz;
+    willLastScore = clamp(45 + redditBuzz * 0.25, 25, 80);
+  }
+
+  let marketStrength = 0;
+  if (hasTrends && !hasYoutube && !hasReddit) {
+    marketStrength = clamp(0.6 * willLastScore + 0.4 * growingScore, 0, 100);
+  } else if (!hasTrends && hasYoutube && hasReddit) {
+    marketStrength = clamp(0.5 * willLastScore + 0.5 * growingScore, 0, 100);
+  } else {
+    const weights: { val: number; w: number }[] = [];
+    weights.push({ val: willLastScore, w: 0.4 });
+    weights.push({ val: growingScore, w: 0.3 });
+    if (hasYoutube) weights.push({ val: ytMomentum, w: 0.2 });
+    if (hasReddit) weights.push({ val: redditBuzz, w: 0.1 });
+    const denom = weights.reduce((a, b) => a + b.w, 0) || 1;
+    marketStrength = clamp(weights.reduce((a, b) => a + b.val * b.w, 0) / denom, 0, 100);
+  }
+
+  const strongSourceCount = [
+    hasTrends && (growingScore >= 55 || willLastScore >= 50),
+    hasYoutube && ytMomentum >= 40,
+    hasReddit && redditBuzz >= 30,
+  ].filter(Boolean).length;
+
+  return {
+    growingScore,
+    willLastScore,
+    marketStrength,
+    ytMomentum,
+    redditBuzz,
+    strongSourceCount,
+  };
+}
+
+const BASELINE_TAM: Record<string, number> = {
+  "Wellness & Supplements": 600,
+  "Functional Beverages": 450,
+  "Beauty & Personal Care": 900,
+  "Healthy Snacking": 500,
+  "Mental Health & Sleep": 350,
+  "Sports Nutrition": 550,
+};
+
+const MARGIN_BANDS: Record<string, [number, number]> = {
+  "Wellness & Supplements": [0.65, 0.75],
+  "Functional Beverages": [0.45, 0.6],
+  "Beauty & Personal Care": [0.6, 0.75],
+  "Healthy Snacking": [0.35, 0.55],
+  "Mental Health & Sleep": [0.55, 0.7],
+  "Sports Nutrition": [0.45, 0.65],
+};
 
 export default async function handler(req: any, res: any) {
   const t0 = Date.now();
@@ -97,33 +209,6 @@ export default async function handler(req: any, res: any) {
       serpapiUsed += 1;
     };
 
-    const withTrendTiming = async <T>(fn: () => Promise<T>) => {
-      const s = Date.now();
-      try {
-        return await fn();
-      } finally {
-        timingsMs.trends += Date.now() - s;
-      }
-    };
-
-    const withYtTiming = async <T>(fn: () => Promise<T>) => {
-      const s = Date.now();
-      try {
-        return await fn();
-      } finally {
-        timingsMs.youtube += Date.now() - s;
-      }
-    };
-
-    const withRedditTiming = async <T>(fn: () => Promise<T>) => {
-      const s = Date.now();
-      try {
-        return await fn();
-      } finally {
-        timingsMs.reddit += Date.now() - s;
-      }
-    };
-
     const baseRows = catalog.map((product) => {
       const { formats, pricing } = buildPricingAndFormats(product, category);
       return {
@@ -133,45 +218,45 @@ export default async function handler(req: any, res: any) {
         google: { series: [] as number[], growthPct: 0, spikeiness: 70, related: [] as string[] },
         youtube: { recentCount: 0, sampleTitles: [] as string[], totalResults: 0 },
         reddit: { mentionCount: 0, sampleThreads: [] as string[] },
+        sourcesUsed: [] as string[],
+        sourceTimingsMs: { trends: 0, youtube: 0, reddit: 0 },
       };
     });
 
     const runLimited = pLimit(4);
 
-    // PASS 1: exactly one primary keyword Trends per product (fallback only on failure)
+    // PASS 1: one Trends call per product primary keyword only
     await Promise.all(
       baseRows.map((row) =>
         runLimited(async () => {
-          const primary = row.product.keywords[0];
-          const fallback = row.product.keywords[1];
+          const keyword = row.product.keywords[0];
+          if (!keyword) return;
 
-          const tryFetch = async (kw: string) => {
-            if (!kw) return null;
-            if (serpapiUsed >= MAX_SERPAPI_REQUESTS_PER_RUN) {
-              partialData = true;
-              partialDataSources.add("Google Trends (budget cap)");
-              return null;
-            }
-            try {
-              return await withTrendTiming(() =>
-                fetchGoogleTrendsSignal(kw, timeframeDays, { onNetworkRequest: incSerp })
-              );
-            } catch {
-              partialData = true;
-              partialDataSources.add("Google Trends");
-              return null;
-            }
-          };
-
-          const first = await tryFetch(primary);
-          if (first) {
-            row.google = first;
+          if (serpapiUsed >= MAX_SERPAPI_REQUESTS_PER_RUN) {
+            partialData = true;
+            partialDataSources.add("Google Trends (budget cap)");
             return;
           }
 
-          const second = await tryFetch(fallback);
-          if (second) {
-            row.google = second;
+          const s = Date.now();
+          try {
+            const gt = await fetchGoogleTrendsSignal(keyword, timeframeDays, { onNetworkRequest: incSerp });
+            row.sourceTimingsMs.trends += Date.now() - s;
+            timingsMs.trends += Date.now() - s;
+
+            const trendsValid = typeof gt.growthPct === "number" || (gt.series?.length || 0) > 5;
+            if (trendsValid) {
+              row.google = gt;
+              row.sourcesUsed.push("trends");
+            } else {
+              partialData = true;
+              partialDataSources.add("Google Trends empty");
+            }
+          } catch {
+            row.sourceTimingsMs.trends += Date.now() - s;
+            timingsMs.trends += Date.now() - s;
+            partialData = true;
+            partialDataSources.add("Google Trends");
           }
         })
       )
@@ -179,81 +264,128 @@ export default async function handler(req: any, res: any) {
 
     baseRows.sort((a, b) => (b.google.growthPct + (100 - b.google.spikeiness)) - (a.google.growthPct + (100 - a.google.spikeiness)));
 
-    // PASS 2: deep proof for winners only
-    const winnersCount = budgetMode ? 3 : 5;
-    const winners = baseRows.slice(0, winnersCount);
+    // PASS 2: winners deep proof
+    const winners = baseRows.slice(0, budgetMode ? 3 : 5);
+    const windowDays = getWindowDays(timeframeDays);
 
     await Promise.all(
       winners.map((row) =>
         runLimited(async () => {
           const keyword = row.product.keywords[0];
 
-          const [relatedResult, ytResult, rdResult] = await Promise.allSettled([
+          const tasks: Promise<any>[] = [];
+
+          tasks.push(
             (async () => {
               if (serpapiUsed >= MAX_SERPAPI_REQUESTS_PER_RUN) {
                 partialData = true;
                 partialDataSources.add("Google Trends (budget cap)");
                 return [] as string[];
               }
+              const s = Date.now();
               try {
-                return await withTrendTiming(() =>
-                  fetchGoogleRelatedQueries(keyword, timeframeDays, { onNetworkRequest: incSerp })
-                );
+                const related = await fetchGoogleRelatedQueries(keyword, timeframeDays, { onNetworkRequest: incSerp });
+                row.sourceTimingsMs.trends += Date.now() - s;
+                timingsMs.trends += Date.now() - s;
+                return related;
               } catch {
+                row.sourceTimingsMs.trends += Date.now() - s;
+                timingsMs.trends += Date.now() - s;
                 partialData = true;
                 partialDataSources.add("Google Trends related");
                 return [] as string[];
               }
-            })(),
+            })()
+          );
+
+          tasks.push(
             (async () => {
+              const s = Date.now();
               try {
-                return await withYtTiming(() => fetchYoutubeSignal(keyword, timeframeDays));
+                const yt = await fetchYoutubeSignal(keyword, windowDays);
+                row.sourceTimingsMs.youtube += Date.now() - s;
+                timingsMs.youtube += Date.now() - s;
+                const ytValid = typeof yt.recentCount === "number";
+                if (ytValid) {
+                  row.youtube = yt;
+                  if (!row.sourcesUsed.includes("youtube")) row.sourcesUsed.push("youtube");
+                } else {
+                  partialData = true;
+                  partialDataSources.add("YouTube empty");
+                }
               } catch {
+                row.sourceTimingsMs.youtube += Date.now() - s;
+                timingsMs.youtube += Date.now() - s;
                 partialData = true;
                 partialDataSources.add("YouTube");
-                return { recentCount: 0, sampleTitles: [], totalResults: 0 };
               }
-            })(),
+            })()
+          );
+
+          tasks.push(
             (async () => {
+              const s = Date.now();
               try {
-                return await withRedditTiming(() => fetchRedditSignal(keyword, timeframeDays));
+                const rd = await fetchRedditSignal(keyword, windowDays);
+                row.sourceTimingsMs.reddit += Date.now() - s;
+                timingsMs.reddit += Date.now() - s;
+                const rdValid = typeof rd.mentionCount === "number";
+                if (rdValid) {
+                  row.reddit = rd;
+                  if (!row.sourcesUsed.includes("reddit")) row.sourcesUsed.push("reddit");
+                } else {
+                  partialData = true;
+                  partialDataSources.add("Reddit empty");
+                }
               } catch {
+                row.sourceTimingsMs.reddit += Date.now() - s;
+                timingsMs.reddit += Date.now() - s;
                 partialData = true;
                 partialDataSources.add("Reddit");
-                return { mentionCount: 0, sampleThreads: [] };
               }
-            })(),
-          ]);
+            })()
+          );
 
-          if (relatedResult.status === "fulfilled") {
-            row.google.related = relatedResult.value;
-          }
-          if (ytResult.status === "fulfilled") {
-            row.youtube = ytResult.value as any;
-          }
-          if (rdResult.status === "fulfilled") {
-            row.reddit = rdResult.value as any;
+          const [related] = await Promise.allSettled(tasks);
+          if (related.status === "fulfilled") {
+            row.google.related = related.value as string[];
           }
         })
       )
     );
 
     const results = baseRows.map((row) => {
-      const metrics = scoreProduct({
-        category,
+      const hasTrends = row.sourcesUsed.includes("trends");
+      const hasYoutube = row.sourcesUsed.includes("youtube");
+      const hasReddit = row.sourcesUsed.includes("reddit");
+
+      const dynamic = computeDynamicScores({
         google: row.google,
         youtube: row.youtube,
         reddit: row.reddit,
-        pricing: row.pricing,
+        hasTrends,
+        hasYoutube,
+        hasReddit,
       });
 
-      const strongSources = [metrics.growingScore >= 55, metrics.creatorMomentumScore >= 40, metrics.buzzScore >= 30].filter(Boolean).length;
-      const classification =
-        metrics.willLastScore >= 60 && (metrics.growingScore >= 65 || metrics.creatorMomentumScore >= 55) && strongSources >= 2
-          ? "REAL TREND"
-          : metrics.fadRiskLabel === "High"
-          ? "FAD"
-          : "EARLY SIGNAL";
+      const classification = classifyTrend({
+        marketStrength: dynamic.marketStrength,
+        willLastScore: dynamic.willLastScore,
+        growingScore: dynamic.growingScore,
+        spikeiness: row.google.spikeiness,
+        strongSourceCount: dynamic.strongSourceCount,
+      });
+
+      const tamEstimateCr = Math.round((BASELINE_TAM[category] || 400) * (0.6 + dynamic.marketStrength / 200));
+      const competitionFactor = row.youtube.totalResults ? Math.min(1, row.youtube.totalResults / 1000000) : Math.min(1, dynamic.ytMomentum / 100);
+      const cacEstimateInr = Math.round(300 + competitionFactor * 1200);
+
+      const marginBand = MARGIN_BANDS[category] || [0.45, 0.6];
+      const marginMid = (marginBand[0] + marginBand[1]) / 2;
+      const aov = (row.pricing.monthly[0] + row.pricing.monthly[1]) / 2;
+      const roiX = Number(Math.max(0.2, Math.min(6, (aov * marginMid) / Math.max(cacEstimateInr, 1))).toFixed(2));
+
+      const fadRiskLabel = row.google.spikeiness >= 80 && dynamic.marketStrength < 35 ? "High" : dynamic.willLastScore >= 60 ? "Low" : "Medium";
 
       const memo = buildFounderMemo({
         productName: row.product.name,
@@ -265,8 +397,8 @@ export default async function handler(req: any, res: any) {
           growthPct: row.google.growthPct,
           recentCount: row.youtube.recentCount,
           mentionCount: row.reddit.mentionCount,
-          marketStrength: metrics.marketStrength,
-          fadRiskLabel: metrics.fadRiskLabel,
+          marketStrength: dynamic.marketStrength,
+          fadRiskLabel,
         },
       });
 
@@ -274,18 +406,18 @@ export default async function handler(req: any, res: any) {
         id: row.product.id,
         category,
         trend_name: row.product.name,
-        trend_score: metrics.marketStrength,
-        market_strength: metrics.marketStrength,
+        trend_score: dynamic.marketStrength,
+        market_strength: dynamic.marketStrength,
         classification,
-        how_fast_its_growing: metrics.growingScore,
-        will_it_last: metrics.willLastScore,
-        money_potential: metrics.marketStrength,
-        creator_momentum: metrics.creatorMomentumScore,
-        people_talking: metrics.buzzScore,
-        tam_estimate_cr: metrics.tamEstimateCr,
-        cac_estimate_inr: metrics.cacEstimateInr,
-        roi_estimate_x: metrics.roiX,
-        fad_risk_label: metrics.fadRiskLabel,
+        how_fast_its_growing: dynamic.growingScore,
+        will_it_last: dynamic.willLastScore,
+        money_potential: dynamic.marketStrength,
+        creator_momentum: dynamic.ytMomentum,
+        people_talking: dynamic.redditBuzz,
+        tam_estimate_cr: tamEstimateCr,
+        cac_estimate_inr: cacEstimateInr,
+        roi_estimate_x: roiX,
+        fad_risk_label: fadRiskLabel,
         formats: row.formats,
         pricing: row.pricing,
         image_data_uri: svgDataUriForProduct(row.product.name, category),
@@ -298,23 +430,32 @@ export default async function handler(req: any, res: any) {
         youtube_titles: row.youtube.sampleTitles,
         youtube_counts: { d7: row.youtube.recentCount, d30: row.youtube.recentCount, d90: row.youtube.recentCount },
         reddit_counts: { d30: row.reddit.mentionCount, d90: row.reddit.mentionCount },
-        google_trends_data: row.google.series.length ? row.google.series : [20, 22, 24, 27, 30, 33, 36, 38, 41, 44, 46, 49],
-        reddit_mentions: Array.from({ length: 12 }, (_, i) => clamp(row.reddit.mentionCount + i, 0, 100)),
+        google_trends_data: row.google.series,
+        reddit_mentions: Array.from({ length: Math.max(12, row.google.series.length || 12) }, (_, i) => clamp(row.reddit.mentionCount + i, 0, 100)),
         evidence_snippets: [memo.proof, ...memo.whyRealOrFad],
         partial_data_note: partialData ? `Quick results (some sources skipped): ${[...partialDataSources].join(", ")}` : undefined,
-        velocity: clamp(Math.round(metrics.growingScore / 3.3), 0, 30),
-        coherence: clamp(Math.round(metrics.willLastScore / 5), 0, 20),
-        competition: clamp(15 - Math.round(metrics.creatorMomentumScore / 10), 1, 15),
+        sourcesUsed: row.sourcesUsed,
+        rawSignals: {
+          growthPct: row.google.growthPct,
+          spikeiness: row.google.spikeiness,
+          ytRecentCount: row.youtube.recentCount,
+          redditMentions: row.reddit.mentionCount,
+        },
+        timings_ms: row.sourceTimingsMs,
+
+        velocity: clamp(Math.round(dynamic.growingScore / 3.3), 0, 30),
+        coherence: clamp(Math.round(dynamic.willLastScore / 5), 0, 20),
+        competition: clamp(15 - Math.round(dynamic.ytMomentum / 10), 1, 15),
         entry_window: classification === "REAL TREND" ? "Early" : classification === "EARLY SIGNAL" ? "Optimal" : "Late",
-        dominance_prob: clamp(Math.round(metrics.marketStrength * 0.9), 0, 100),
-        feasibility: clamp(Math.round(65 + metrics.marketStrength * 0.2), 0, 100),
-        fad_risk: clamp(100 - metrics.willLastScore, 0, 100),
-        structural_shift: clamp(metrics.willLastScore, 0, 100),
+        dominance_prob: clamp(Math.round(dynamic.marketStrength * 0.9), 0, 100),
+        feasibility: clamp(Math.round(65 + dynamic.marketStrength * 0.2), 0, 100),
+        fad_risk: clamp(100 - dynamic.willLastScore, 0, 100),
+        structural_shift: clamp(dynamic.willLastScore, 0, 100),
         regulatory_risk: "Estimate only. Validate claims with compliant labeling before launch.",
-        tam_band: `INR ${metrics.tamEstimateCr} Cr (Estimate)`,
-        cac_band: `INR ${metrics.cacEstimateInr} (Estimate)`,
-        margin_band: `${metrics.marginBandLabel} (Estimate)`,
-        payback_estimate: `ROI ${metrics.roiX}x (Estimate)`,
+        tam_band: `INR ${tamEstimateCr} Cr (Estimate)`,
+        cac_band: `INR ${cacEstimateInr} (Estimate)`,
+        margin_band: `${Math.round(marginBand[0] * 100)}-${Math.round(marginBand[1] * 100)}% (Estimate)`,
+        payback_estimate: `ROI ${roiX}x (Estimate)`,
         price_ladder: `Trial INR ${row.pricing.trial[0]}-${row.pricing.trial[1]} | Monthly INR ${row.pricing.monthly[0]}-${row.pricing.monthly[1]} | Bundle INR ${row.pricing.bundle[0]}-${row.pricing.bundle[1]}`,
         format_recommendation: row.formats.join(" / "),
       };
