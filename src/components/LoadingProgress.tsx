@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { Radio, Youtube, MessageCircle, BarChart3, FileText, Check, Loader2 } from "lucide-react";
+import { Radio, Youtube, BarChart3, FileText, Check, Loader2 } from "lucide-react";
 
 const steps = [
   { label: "Discovering Queries", icon: Radio },
   { label: "Fetching YouTube", icon: Youtube },
-  { label: "Scanning Reddit", icon: MessageCircle },
   { label: "Scoring", icon: BarChart3 },
   { label: "Building Founder Memos", icon: FileText },
 ];

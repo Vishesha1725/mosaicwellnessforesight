@@ -496,37 +496,29 @@ export async function runRadar(input: RunRadarInput): Promise<{
       partialDataSources.add("YouTube");
     }
 
-    let redditScore = 0;
     let redditCounts = { d30: 0, d90: 0 };
-    try {
-      const rd = await redditSignal(candidate);
-      redditScore = rd.score;
-      redditCounts = rd.counts;
-    } catch {
-      partialDataSources.add("Reddit");
-    }
 
     const moneyPotential = clamp(MONEY_BASE[category] + growthScore * 0.25 + durability * 0.1);
 
     const trendScore = clamp(
-      durability * 0.34 + growthScore * 0.26 + ytMomentum * 0.16 + redditScore * 0.1 + moneyPotential * 0.14
+      durability * 0.36 + growthScore * 0.3 + ytMomentum * 0.16 + moneyPotential * 0.18
     );
 
     const strongGrowth = growthScore >= 65;
     const strongCreator = ytMomentum >= 60;
-    const sourceCount = [growthScore >= 55, ytMomentum >= 45, redditScore >= 35].filter(Boolean).length;
+    const sourceCount = [growthScore >= 55, ytMomentum >= 45].filter(Boolean).length;
 
     let classification: TrendLabel = "EARLY SIGNAL";
     if (durability >= 60 && (strongGrowth || strongCreator) && sourceCount >= 2) {
       classification = "REAL TREND";
-    } else if (spikeiness >= 72 || sourceCount <= 1) {
+    } else if (spikeiness >= 72 || sourceCount === 0) {
       classification = "FAD";
     }
 
     const whyBullets = [
       `Durability score ${durability}/100 (${spikeiness >= 60 ? "spiky" : "stable"} search pattern).`,
       `Growth signal ${growthScore}/100 with ${growthPct >= 0 ? "+" : ""}${clamp(growthPct, -999, 999)}% change in timeframe.`,
-      `Cross-source proof: ${sourceCount}/3 strong sources (Google, YouTube, Reddit).`,
+      `Cross-source proof: ${sourceCount}/2 strong sources (Google, YouTube).`,
     ];
 
     const formatRecommendation = `Format ideas: ${CATEGORY_FORMATS[category].join(" / ")}.`;
@@ -543,7 +535,7 @@ export async function runRadar(input: RunRadarInput): Promise<{
       how_fast_its_growing: growthScore,
       will_it_last: durability,
       creator_momentum: ytMomentum,
-      people_talking: redditScore,
+      people_talking: 0,
       money_potential: moneyPotential,
       spikeiness,
       source_count: sourceCount,
