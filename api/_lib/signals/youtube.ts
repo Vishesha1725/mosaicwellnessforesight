@@ -1,10 +1,11 @@
-import { getCache, setCache } from "../cache.js";
+import { CACHE_TTL_MS, getCache, setCache } from "../cache.js";
+import { fetchWithTimeout } from "../fetchWithTimeout.js";
 
 export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
   const key = process.env.YOUTUBE_API_KEY || "";
   if (!key) throw new Error("missing_youtube_key");
 
-  const cacheKey = `yt:${query}:${timeframeDays}`;
+  const cacheKey = `youtube:${query}:${timeframeDays}`;
   const cached = getCache<any>(cacheKey);
   if (cached) return cached;
 
@@ -13,9 +14,9 @@ export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
     `?part=snippet&type=video&order=date&maxResults=15&q=${encodeURIComponent(query)}` +
     `&key=${encodeURIComponent(key)}`;
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("youtube_fetch_failed");
-  const data = await res.json();
+  const result = await fetchWithTimeout<any>(url, undefined, 3500);
+  if (!result.ok) throw new Error(result.timeout ? "youtube_timeout" : "youtube_fetch_failed");
+  const data = result.data;
   const items = Array.isArray(data?.items) ? data.items : [];
 
   const now = Date.now();
@@ -32,6 +33,6 @@ export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
     sampleTitles: items.map((x: any) => x?.snippet?.title).filter(Boolean).slice(0, 2),
     totalResults: Number(data?.pageInfo?.totalResults || 0),
   };
-  setCache(cacheKey, normalized);
+  setCache(cacheKey, normalized, CACHE_TTL_MS.youtube);
   return normalized;
 }

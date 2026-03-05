@@ -16,6 +16,8 @@ interface RadarState {
   partialData?: boolean;
   partialDataSources?: string[];
   discoveryCount?: number;
+  serpapiBudget?: { used: number; max: number; budgetMode: boolean };
+  timingsMs?: { total: number; trends: number; youtube: number; reddit: number };
 }
 
 const badgeClass: Record<string, string> = {
@@ -54,6 +56,8 @@ const RadarResults = () => {
     partialData,
     partialDataSources,
     discoveryCount,
+    serpapiBudget,
+    timingsMs,
   } = state;
 
   const topPicks = useMemo(() => trends.slice(0, 5), [trends]);
@@ -94,6 +98,18 @@ const RadarResults = () => {
               {s}
             </span>
           ))}
+          {serpapiBudget && (
+            <>
+              <span className="text-border">-</span>
+              <span className="text-muted-foreground">Budget mode: Using <span className="text-foreground font-semibold">{serpapiBudget.used}/{serpapiBudget.max}</span> searches</span>
+            </>
+          )}
+          {timingsMs && (
+            <>
+              <span className="text-border">-</span>
+              <span className="text-muted-foreground">Run: <span className="text-foreground font-semibold">{timingsMs.total}ms</span></span>
+            </>
+          )}
           <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">
             {"\u2190"} New Scan
           </button>
@@ -107,7 +123,7 @@ const RadarResults = () => {
 
         {partialData && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl px-5 py-4 text-sm text-yellow-200">
-            Partial data: {partialDataSources?.join(", ")}
+            Quick results (some sources skipped): {partialDataSources?.join(", ")}
           </div>
         )}
 

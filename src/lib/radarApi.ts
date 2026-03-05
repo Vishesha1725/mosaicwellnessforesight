@@ -13,12 +13,15 @@ interface RadarRunResponse {
   discoveryCount?: number;
   candidatesDiscovered?: number;
   topPicks?: TrendData[];
+  serpapiBudget?: { used: number; max: number; budgetMode: boolean };
+  timingsMs?: { total: number; trends: number; youtube: number; reddit: number };
 }
 
 export async function runLiveRadar(params: {
   category: string;
   timeframe: number;
   limit?: number;
+  budgetMode?: boolean;
 }): Promise<RadarRunResponse> {
   const response = await fetch("/api/radar/run", {
     method: "POST",

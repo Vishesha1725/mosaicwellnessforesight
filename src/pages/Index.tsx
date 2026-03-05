@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import RadarHeader from "@/components/RadarHeader";
 import RadarPulse from "@/components/RadarPulse";
@@ -21,6 +21,20 @@ const Index = () => {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube", "Reddit"]);
   const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
+  const [budgetMode, setBudgetMode] = useState(true);
+  const [scanProgress, setScanProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setScanProgress(0);
+      return;
+    }
+    setScanProgress(1);
+    const timer = setInterval(() => {
+      setScanProgress((prev) => (prev < 8 ? prev + 1 : prev));
+    }, 350);
+    return () => clearInterval(timer);
+  }, [isLoading]);
 
   const handleCategoryChange = (v: string) => {
     setCategory(v);
@@ -53,6 +67,7 @@ const Index = () => {
         category,
         timeframe: timeWindow,
         limit: 10,
+        budgetMode,
       });
 
       const trends = payload.results as TrendData[];
@@ -73,11 +88,13 @@ const Index = () => {
           partialData: payload.partialData,
           partialDataSources: payload.partialDataSources,
           discoveryCount: payload.discoveryCount,
+          serpapiBudget: payload.serpapiBudget,
+          timingsMs: payload.timingsMs,
         },
       });
 
       if (payload.partialData) {
-        toast.info(`Partial data: ${payload.partialDataSources.join(", ")}.`, { duration: 5000 });
+        toast.info(`Quick results (some sources skipped): ${payload.partialDataSources.join(", ")}.`, { duration: 5000 });
       }
 
       if (!payload.liveMode) {
@@ -127,6 +144,7 @@ const Index = () => {
         {isLoading ? (
           <div className="py-16">
             <LoadingProgress isActive={isLoading} />
+            <p className="text-center text-xs text-muted-foreground mt-4 font-mono">Scanning {scanProgress}/8...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-8">
@@ -144,6 +162,19 @@ const Index = () => {
               activeSources={activeSources}
               onToggle={handleToggleSource}
             />
+
+            <div className="glass-card px-4 py-3 w-full max-w-lg flex items-center justify-between">
+              <div className="text-left">
+                <p className="text-sm font-semibold text-foreground">Budget Mode</p>
+                <p className="text-xs text-muted-foreground">On = lower SerpAPI usage, faster scans</p>
+              </div>
+              <button
+                onClick={() => setBudgetMode((v) => !v)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${budgetMode ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/40 border-border text-muted-foreground"}`}
+              >
+                {budgetMode ? "ON" : "DEEP"}
+              </button>
+            </div>
 
             <div className="glass-card-elevated p-10 max-w-lg w-full relative">
               <div className="relative flex items-center justify-center mb-8">

@@ -1,4 +1,7 @@
-import { getCache, setCache } from "../cache.js";
+import { CACHE_TTL_MS, getCache, setCache } from "../cache.js";
+import { fetchWithTimeout } from "../fetchWithTimeout.js";
+
+type SerpOptions = { onNetworkRequest?: () => void };
 
 function toSerpDate(days: number) {
   if (days <= 7) return "now 7-d";
@@ -40,26 +43,55 @@ function calcSpikeiness(series: number[]) {
   return Math.max(0, Math.min(100, Math.round(spike)));
 }
 
-export async function fetchGoogleTrendsSignal(query: string, timeframeDays: number) {
-  const keyName = process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY || process.env.SERP_API_KEY || "";
-  if (!keyName) throw new Error("missing_serpapi_key");
+function getSerpKey() {
+  return process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY || process.env.SERP_API_KEY || "";
+}
 
-  const cacheKey = `gt:${query}:${timeframeDays}`;
+async function doSerpRequest(query: string, timeframeDays: number, extra: Record<string, string>, options?: SerpOptions) {
+  const apiKey = getSerpKey();
+  if (!apiKey) throw new Error("missing_serpapi_key");
+
+  const params = new URLSearchParams({
+    engine: "google_trends",
+    q: query,
+    geo: "IN",
+    date: toSerpDate(timeframeDays),
+    api_key: apiKey,
+    ...extra,
+  });
+
+  options?.onNetworkRequest?.();
+  const result = await fetchWithTimeout<any>(`https://serpapi.com/search.json?${params.toString()}`, undefined, 4500);
+  if (!result.ok) {
+    throw new Error(result.timeout ? "google_trends_timeout" : `google_trends_fetch_failed:${result.error || "unknown"}`);
+  }
+  return result.data;
+}
+
+export async function fetchGoogleTrendsSignal(query: string, timeframeDays: number, options?: SerpOptions) {
+  const cacheKey = `serpapi:trends:${query}:${timeframeDays}`;
   const cached = getCache<any>(cacheKey);
   if (cached) return cached;
 
-  const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(query)}&geo=IN&date=${encodeURIComponent(toSerpDate(timeframeDays))}&api_key=${encodeURIComponent(keyName)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("google_trends_fetch_failed");
-  const data = await res.json();
-
+  const data = await doSerpRequest(query, timeframeDays, {}, options);
   const series = parseSeries(data);
   const normalized = {
     series,
     growthPct: calcGrowthPct(series),
     spikeiness: calcSpikeiness(series),
-    related: parseRelated(data),
+    related: [] as string[],
   };
-  setCache(cacheKey, normalized);
+  setCache(cacheKey, normalized, CACHE_TTL_MS.serpapi);
   return normalized;
+}
+
+export async function fetchGoogleRelatedQueries(query: string, timeframeDays: number, options?: SerpOptions): Promise<string[]> {
+  const cacheKey = `serpapi:related:${query}:${timeframeDays}`;
+  const cached = getCache<string[]>(cacheKey);
+  if (cached) return cached;
+
+  const data = await doSerpRequest(query, timeframeDays, { data_type: "RELATED_QUERIES" }, options);
+  const related = parseRelated(data);
+  setCache(cacheKey, related, CACHE_TTL_MS.serpapi);
+  return related;
 }
