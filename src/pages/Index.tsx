@@ -11,7 +11,7 @@ import { runLiveRadar } from "@/lib/radarApi";
 import { toast } from "sonner";
 import { Radar } from "lucide-react";
 
-const allSources = ["Google Trends", "YouTube", "Amazon (Beta)"];
+const allSources = ["Google Trends", "YouTube", "Reddit", "Amazon (Beta)"];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ const Index = () => {
   const [timeWindow, setTimeWindow] = useState(90);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube"]);
+  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube", "Reddit"]);
   const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
 
   const handleCategoryChange = (v: string) => {
@@ -135,7 +135,7 @@ const Index = () => {
                 Real trend discovery for Indian wellness categories
               </h2>
               <p className="text-base text-muted-foreground leading-relaxed">
-                We discover related rising queries from starter anchors, score them across Google Trends and YouTube, and return founder-ready trend picks.
+                We score curated futuristic products with Google Trends, YouTube, and Reddit signals to generate founder-ready opportunities.
               </p>
             </div>
 

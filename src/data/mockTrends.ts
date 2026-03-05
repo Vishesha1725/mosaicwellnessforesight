@@ -13,6 +13,26 @@ export interface TrendData {
   people_talking?: number;
   why_bullets?: string[];
   thumbnail_url?: string;
+  image_data_uri?: string;
+  market_strength?: number;
+  tam_estimate_cr?: number;
+  cac_estimate_inr?: number;
+  roi_estimate_x?: number;
+  fad_risk_label?: "Low" | "Medium" | "High";
+  formats?: string[];
+  pricing?: { trial: [number, number]; monthly: [number, number]; bundle: [number, number] };
+  founder_memo?: {
+    whatHappening: string;
+    proof: string;
+    whyRealOrFad: string[];
+    productWedge: string[];
+    formatsAndPricing: string;
+    gtmIndia: string;
+    risksAndFixes: string[];
+    ninetyDayPlan: string;
+  };
+  one_liner?: string;
+  keywords?: string[];
   youtube_titles?: string[];
   youtube_counts?: { d7: number; d30: number; d90: number };
   reddit_counts?: { d30: number; d90: number };

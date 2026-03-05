@@ -11,6 +11,8 @@ interface RadarRunResponse {
   partialDataSources?: string[];
   liveMode?: boolean;
   discoveryCount?: number;
+  candidatesDiscovered?: number;
+  topPicks?: TrendData[];
 }
 
 export async function runLiveRadar(params: {
@@ -37,6 +39,6 @@ export async function runLiveRadar(params: {
     results: normalizedResults,
     liveMode,
     partialDataSources: data.partialDataSources ?? [],
-    discoveryCount: data.discoveryCount ?? normalizedResults.length,
+    discoveryCount: data.discoveryCount ?? data.candidatesDiscovered ?? normalizedResults.length,
   };
 }

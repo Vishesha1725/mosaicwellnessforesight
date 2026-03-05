@@ -68,11 +68,20 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
             <div className="glass-card p-5">
               <p className="text-sm text-secondary-foreground leading-relaxed whitespace-pre-wrap">{trend.founder_brief}</p>
             </div>
+            {trend.founder_memo && (
+              <div className="glass-card p-4 space-y-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">90-Day Plan</p>
+                <p className="text-xs text-secondary-foreground whitespace-pre-wrap">{trend.founder_memo.ninetyDayPlan}</p>
+              </div>
+            )}
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Core Metrics</p>
               <p className="text-sm text-foreground">How fast it's growing: <span className="font-semibold">{trend.how_fast_its_growing ?? 0}/100</span></p>
               <p className="text-sm text-foreground">Will it last: <span className="font-semibold">{trend.will_it_last ?? 0}/100</span></p>
-              <p className="text-sm text-foreground">Money potential: <span className="font-semibold">{trend.money_potential ?? 0}/100</span></p>
+              <p className="text-sm text-foreground">Market strength: <span className="font-semibold">{trend.market_strength ?? trend.trend_score ?? 0}/100</span></p>
+              <p className="text-sm text-foreground">TAM: <span className="font-semibold">INR {trend.tam_estimate_cr ?? "-"} Cr (est)</span></p>
+              <p className="text-sm text-foreground">CAC: <span className="font-semibold">INR {trend.cac_estimate_inr ?? "-"} (est)</span> | ROI: <span className="font-semibold">{trend.roi_estimate_x ?? "-"}x</span></p>
+              <p className="text-sm text-foreground">Fad Risk: <span className="font-semibold">{trend.fad_risk_label ?? "Medium"}</span></p>
             </div>
             <button
               onClick={copyMemo}
@@ -108,6 +117,18 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               <p className="text-sm text-foreground">Posts in 30d: <span className="font-semibold">{trend.reddit_counts?.d30 ?? 0}</span></p>
               <p className="text-sm text-foreground">Posts in 90d: <span className="font-semibold">{trend.reddit_counts?.d90 ?? 0}</span></p>
             </div>
+
+            {!!trend.formats?.length && (
+              <div className="glass-card p-4 space-y-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Formats + Pricing</p>
+                <p className="text-sm text-foreground">{trend.formats.join(" / ")}</p>
+                {trend.pricing && (
+                  <p className="text-xs text-secondary-foreground">
+                    Trial INR {trend.pricing.trial[0]}-{trend.pricing.trial[1]} | Monthly INR {trend.pricing.monthly[0]}-{trend.pricing.monthly[1]} | Bundle INR {trend.pricing.bundle[0]}-{trend.pricing.bundle[1]}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Why this is {trend.classification || "EARLY SIGNAL"}</p>

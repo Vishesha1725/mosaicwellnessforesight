@@ -116,8 +116,8 @@ const RadarResults = () => {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {topPicks.map((trend, idx) => (
               <article key={trend.id || `${trend.trend_name}-${idx}`} className="rounded-2xl bg-card/80 border border-border overflow-hidden">
-                {trend.thumbnail_url ? (
-                  <img src={trend.thumbnail_url} alt={trend.trend_name} className="w-full h-36 object-cover" />
+                {(trend.image_data_uri || trend.thumbnail_url) ? (
+                  <img src={trend.image_data_uri || trend.thumbnail_url} alt={trend.trend_name} className="w-full h-36 object-cover" />
                 ) : (
                   <div className="h-36" style={{ background: placeholderGradients[idx % placeholderGradients.length] }} />
                 )}
@@ -138,10 +138,29 @@ const RadarResults = () => {
                       <p className="text-sm font-semibold text-foreground">{trend.will_it_last ?? 0}</p>
                     </div>
                     <div className="glass-card p-2">
-                      <p className="text-[10px] text-muted-foreground">Money (INR)</p>
-                      <p className="text-sm font-semibold text-foreground">{trend.money_potential ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">Market Strength</p>
+                      <p className="text-sm font-semibold text-foreground">{trend.market_strength ?? trend.trend_score ?? 0}</p>
                     </div>
                   </div>
+                  <div className="glass-card p-2 text-[11px] text-muted-foreground leading-relaxed">
+                    <p>TAM: <span className="text-foreground font-semibold">INR {trend.tam_estimate_cr ?? "-"} Cr (est)</span></p>
+                    <p>CAC: <span className="text-foreground font-semibold">INR {trend.cac_estimate_inr ?? "-"} (est)</span> | ROI: <span className="text-foreground font-semibold">{trend.roi_estimate_x ?? "-"}x (est)</span></p>
+                    <p>Fad Risk: <span className="text-foreground font-semibold">{trend.fad_risk_label ?? "Medium"}</span></p>
+                  </div>
+                  {!!trend.formats?.length && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {trend.formats.slice(0, 3).map((f) => (
+                        <span key={f} className="px-2 py-1 rounded-full text-[10px] border border-primary/30 bg-primary/10 text-primary">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {trend.pricing && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Trial INR {trend.pricing.trial[0]}-{trend.pricing.trial[1]} | Monthly INR {trend.pricing.monthly[0]}-{trend.pricing.monthly[1]} | Bundle INR {trend.pricing.bundle[0]}-{trend.pricing.bundle[1]}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setSelected({ trend, tab: "memo" })}
@@ -167,8 +186,8 @@ const RadarResults = () => {
           <div className="grid gap-3 md:grid-cols-2">
             {trends.map((trend, idx) => (
               <div key={`${trend.id}-${idx}`} className="glass-card p-4 flex items-start gap-3">
-                <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden" style={!trend.thumbnail_url ? { background: placeholderGradients[idx % placeholderGradients.length] } : undefined}>
-                  {trend.thumbnail_url && <img src={trend.thumbnail_url} alt={trend.trend_name} className="w-full h-full object-cover" />}
+                <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden" style={!(trend.image_data_uri || trend.thumbnail_url) ? { background: placeholderGradients[idx % placeholderGradients.length] } : undefined}>
+                  {(trend.image_data_uri || trend.thumbnail_url) && <img src={trend.image_data_uri || trend.thumbnail_url} alt={trend.trend_name} className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -177,7 +196,7 @@ const RadarResults = () => {
                       {trend.classification || "EARLY SIGNAL"}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Score {trend.trend_score}/100</p>
+                  <p className="text-xs text-muted-foreground mt-1">Market Strength {trend.market_strength ?? trend.trend_score}/100 · TAM INR {trend.tam_estimate_cr ?? "-" } Cr · ROI {trend.roi_estimate_x ?? "-"}x</p>
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => setSelected({ trend, tab: "memo" })} className="text-xs text-primary font-medium">Founder Memo</button>
                     <span className="text-muted-foreground text-xs">|</span>
