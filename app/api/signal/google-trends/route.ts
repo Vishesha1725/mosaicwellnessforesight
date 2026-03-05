@@ -1,4 +1,4 @@
-import { runRadar } from "../../../../../api/_lib/radarCore";
+import { runRadar } from "../../_lib/radarCore";
 
 export async function POST(request: Request) {
   try {

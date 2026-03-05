@@ -1,4 +1,4 @@
-import { runRadar } from "../../_lib/radarCore";
+import { runRadar } from "../../app/api/_lib/radarCore";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {

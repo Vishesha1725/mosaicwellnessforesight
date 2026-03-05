@@ -1,4 +1,4 @@
-import { runRadar } from "../../../../../api/_lib/radarCore";
+import { runRadar } from "../../_lib/radarCore";
 import { getSampleTrends } from "../../../../../api/_lib/sampleTrends";
 import { validateKeys } from "../../../../../lib/env";
 
