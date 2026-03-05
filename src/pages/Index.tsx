@@ -11,7 +11,7 @@ import { runLiveRadar } from "@/lib/radarApi";
 import { toast } from "sonner";
 import { Radar } from "lucide-react";
 
-const allSources = ["Google Trends", "YouTube", "Reddit", "Amazon (Beta)"];
+const allSources = ["Google Trends", "YouTube"];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -19,9 +19,8 @@ const Index = () => {
   const [timeWindow, setTimeWindow] = useState(90);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube", "Reddit"]);
+  const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube"]);
   const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
-  const [budgetMode, setBudgetMode] = useState(true);
   const [scanProgress, setScanProgress] = useState(0);
 
   useEffect(() => {
@@ -49,9 +48,6 @@ const Index = () => {
   };
 
   const handleToggleSource = (source: string) => {
-    if (source.startsWith("Amazon")) {
-      toast.message("Amazon signal is optional beta and won't block radar runs.", { duration: 2500 });
-    }
     setActiveSources((prev) =>
       prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
     );
@@ -67,7 +63,6 @@ const Index = () => {
         category,
         timeframe: timeWindow,
         limit: 10,
-        budgetMode,
       });
 
       const trends = payload.results as TrendData[];
@@ -88,14 +83,9 @@ const Index = () => {
           partialData: payload.partialData,
           partialDataSources: payload.partialDataSources,
           discoveryCount: payload.discoveryCount,
-          serpapiBudget: payload.serpapiBudget,
           timingsMs: payload.timingsMs,
         },
       });
-
-      if (payload.partialData) {
-        toast.info(`Full scan: Google Trends + YouTube (may take longer). Unavailable: ${payload.partialDataSources.join(", ") || "none"}.`, { duration: 5000 });
-      }
 
       if (!payload.liveMode) {
         toast.info("Demo mode: API keys missing. Add SERPAPI_API_KEY and YOUTUBE_API_KEY for full live discovery.", {
@@ -162,19 +152,6 @@ const Index = () => {
               activeSources={activeSources}
               onToggle={handleToggleSource}
             />
-
-            <div className="glass-card px-4 py-3 w-full max-w-lg flex items-center justify-between">
-              <div className="text-left">
-                <p className="text-sm font-semibold text-foreground">Budget Mode</p>
-                <p className="text-xs text-muted-foreground">On = lower SerpAPI usage, faster scans</p>
-              </div>
-              <button
-                onClick={() => setBudgetMode((v) => !v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${budgetMode ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/40 border-border text-muted-foreground"}`}
-              >
-                {budgetMode ? "ON" : "DEEP"}
-              </button>
-            </div>
 
             <div className="glass-card-elevated p-10 max-w-lg w-full relative">
               <div className="relative flex items-center justify-center mb-8">

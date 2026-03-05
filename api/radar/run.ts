@@ -19,7 +19,6 @@ const CATEGORIES = [
 ] as const;
 
 type Category = (typeof CATEGORIES)[number];
-const MAX_SERPAPI_REQUESTS_PER_RUN = 15;
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -180,8 +179,6 @@ export default async function handler(req: any, res: any) {
     const category = (CATEGORIES.includes(categoryInput as Category) ? categoryInput : CATEGORIES[0]) as Category;
     const timeframeDays = clamp(Number(req.body?.timeframe) || 90, 7, 365);
     const limit = clamp(Number(req.body?.limit) || 8, 5, 10);
-    const budgetMode = req.body?.budgetMode !== false;
-
     const keys = validateKeys();
     const catalog = (CATALOG[category] || []).slice(0, 8);
 
@@ -206,13 +203,11 @@ export default async function handler(req: any, res: any) {
         partialDataSources: ["Google Trends", "YouTube"],
         liveMode: false,
         discoveryCount: 8,
-        serpapiBudget: { used: 0, max: MAX_SERPAPI_REQUESTS_PER_RUN, budgetMode },
         timingsMs,
       });
       return;
     }
 
-    let serpapiUsed = 0;
     let partialData = false;
     const partialDataSources = new Set<string>();
     const serpLimiter = pLimit(2);
@@ -243,22 +238,12 @@ export default async function handler(req: any, res: any) {
 
           const trendsTask = (async () => {
             if (!keys.serpApi || !primary) return { ok: false };
-            if (serpapiUsed >= MAX_SERPAPI_REQUESTS_PER_RUN) {
-              partialData = true;
-              partialDataSources.add("Google Trends (budget cap)");
-              return { ok: false };
-            }
 
             return serpLimiter(async () => {
               const s = Date.now();
               try {
                 const gt = await fetchGoogleTrendsWithFallback(primary, fallbackKeywords, timeframeDays, {
-                  onNetworkRequest: () => {
-                    if (serpapiUsed >= MAX_SERPAPI_REQUESTS_PER_RUN) {
-                      throw new Error("serpapi_budget_cap_reached");
-                    }
-                    serpapiUsed += 1;
-                  },
+                  onNetworkRequest: () => {},
                 });
                 row.sourceTimingsMs.trends += Date.now() - s;
                 timingsMs.trends += Date.now() - s;
@@ -384,7 +369,6 @@ export default async function handler(req: any, res: any) {
         partialDataSources: ["Google Trends", "YouTube"],
         liveMode: false,
         discoveryCount: 8,
-        serpapiBudget: { used: serpapiUsed, max: MAX_SERPAPI_REQUESTS_PER_RUN, budgetMode },
         timingsMs,
       });
       return;
@@ -530,7 +514,7 @@ export default async function handler(req: any, res: any) {
     const sliced = results.slice(0, Math.min(limit, 8));
 
     timingsMs.total = Date.now() - t0;
-    console.log("[radar] timing", { ...timingsMs, serpapiUsed, category, timeframeDays, budgetMode });
+    console.log("[radar] timing", { ...timingsMs, category, timeframeDays });
 
     res.status(200).json({
       mode: "live",
@@ -544,7 +528,6 @@ export default async function handler(req: any, res: any) {
       partialDataSources: [...partialDataSources],
       liveMode: true,
       discoveryCount: catalog.length,
-      serpapiBudget: { used: serpapiUsed, max: MAX_SERPAPI_REQUESTS_PER_RUN, budgetMode },
       timingsMs,
     });
   } catch (error: any) {
@@ -563,7 +546,6 @@ export default async function handler(req: any, res: any) {
       partialDataSources: ["Google Trends", "YouTube", "Reddit"],
       liveMode: false,
       discoveryCount: 8,
-      serpapiBudget: { used: 0, max: MAX_SERPAPI_REQUESTS_PER_RUN, budgetMode: true },
       timingsMs,
     });
   }

@@ -16,7 +16,6 @@ interface RadarState {
   partialData?: boolean;
   partialDataSources?: string[];
   discoveryCount?: number;
-  serpapiBudget?: { used: number; max: number; budgetMode: boolean };
   timingsMs?: { total: number; trends: number; youtube: number; reddit: number };
 }
 
@@ -46,37 +45,19 @@ const RadarResults = () => {
   }, [state, navigate]);
   if (!state) return null;
 
-  const {
-    trends,
-    sampleFallback,
-    dataSource,
-    category,
-    timeWindow,
-    lastUpdated,
-    activeSources,
-    partialData,
-    partialDataSources,
-    discoveryCount,
-    serpapiBudget,
-    timingsMs,
-  } = state;
-
+  const { trends, sampleFallback, dataSource, category, timeWindow, lastUpdated, activeSources, discoveryCount, timingsMs } = state;
   const topPicks = useMemo(() => trends.slice(0, 5), [trends]);
   const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow} Days`;
   const coverage = useMemo(
     () => ({
       trends: trends.some((t) => t.sourcesUsed?.includes("trends")),
       youtube: trends.some((t) => t.sourcesUsed?.includes("youtube")),
-      reddit: trends.some((t) => t.sourcesUsed?.includes("reddit")),
     }),
     [trends]
   );
 
   return (
-    <div
-      className="min-h-screen bg-noise relative overflow-hidden p-4 sm:p-6"
-      style={{ background: "linear-gradient(135deg, hsl(220 20% 6%) 0%, hsl(220 22% 8%) 40%, hsl(240 15% 10%) 100%)" }}
-    >
+    <div className="min-h-screen bg-noise relative overflow-hidden p-4 sm:p-6" style={{ background: "linear-gradient(135deg, hsl(220 20% 6%) 0%, hsl(220 22% 8%) 40%, hsl(240 15% 10%) 100%)" }}>
       <div className="relative z-10 max-w-6xl mx-auto space-y-6">
         <RadarHeader
           category={category}
@@ -100,16 +81,8 @@ const RadarResults = () => {
           <span className="text-border">-</span>
           <span className="text-muted-foreground">Signals:</span>
           {activeSources.map((s) => (
-            <span key={s} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">
-              {s}
-            </span>
+            <span key={s} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/30 text-primary">{s}</span>
           ))}
-          {serpapiBudget && (
-            <>
-              <span className="text-border">-</span>
-              <span className="text-muted-foreground">Budget mode: Using <span className="text-foreground font-semibold">{serpapiBudget.used}/{serpapiBudget.max}</span> searches</span>
-            </>
-          )}
           {timingsMs && (
             <>
               <span className="text-border">-</span>
@@ -117,23 +90,13 @@ const RadarResults = () => {
             </>
           )}
           <span className="text-border">-</span>
-          <span className="text-muted-foreground">
-            Live data used: Trends {coverage.trends ? "✅" : "❌"} YouTube {coverage.youtube ? "✅" : "❌"} Reddit {coverage.reddit ? "✅" : "❌"}
-          </span>
-          <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">
-            {"\u2190"} New Scan
-          </button>
+          <span className="text-muted-foreground">Live data used: Trends {coverage.trends ? "✅" : "❌"} | YouTube {coverage.youtube ? "✅" : "❌"}</span>
+          <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">{"\u2190"} New Scan</button>
         </div>
 
         {sampleFallback && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 text-sm text-amber-300">
             Demo mode active: API keys are missing, so live discovery is limited.
-          </div>
-        )}
-
-        {partialData && (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl px-5 py-4 text-sm text-yellow-200">
-            Full scan: Google Trends + YouTube (may take longer){partialDataSources?.length ? ` | unavailable: ${partialDataSources.join(", ")}` : ""}
           </div>
         )}
 
@@ -150,9 +113,7 @@ const RadarResults = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-foreground leading-tight">{cleanText(trend.trend_name)}</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>
-                      {trend.classification || "EARLY SIGNAL"}
-                    </span>
+                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>{trend.classification || "EARLY SIGNAL"}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Growing</p><p className="text-sm font-semibold text-foreground">{metric(trend.how_fast_its_growing)}</p></div>
@@ -163,7 +124,6 @@ const RadarResults = () => {
                     <p>TAM: <span className="text-foreground font-semibold">INR {metric(trend.tam_estimate_cr)} Cr (est)</span></p>
                     <p>CAC: <span className="text-foreground font-semibold">INR {metric(trend.cac_estimate_inr)} (est)</span> | ROI: <span className="text-foreground font-semibold">{metric(trend.roi_estimate_x)}x (est)</span></p>
                     <p>Fad Risk: <span className="text-foreground font-semibold">{trend.fad_risk_label ?? "Medium"}</span></p>
-                    {trend.proof_status && <p className="text-yellow-200">{cleanText(trend.proof_status)}</p>}
                   </div>
                   {!!trend.formats?.length && (
                     <div className="flex flex-wrap gap-1.5">
@@ -198,9 +158,7 @@ const RadarResults = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm text-foreground truncate">{cleanText(trend.trend_name)}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>
-                      {trend.classification || "EARLY SIGNAL"}
-                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[trend.classification || "EARLY SIGNAL"]}`}>{trend.classification || "EARLY SIGNAL"}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Market Strength {metric(trend.market_strength ?? trend.trend_score)}/100 - TAM INR {metric(trend.tam_estimate_cr)} Cr - ROI {metric(trend.roi_estimate_x)}x</p>
                   <div className="flex items-center gap-2 mt-2">

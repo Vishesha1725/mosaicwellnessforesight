@@ -89,13 +89,14 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
           <>
             <div className="glass-card p-4">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Google Trends (India)</p>
-              {timeline.length > 0 ? <Sparkline data={timeline} height={54} /> : <p className="text-xs text-muted-foreground">No public signal found for this query yet.</p>}
+              {timeline.length > 0 ? <Sparkline data={timeline} height={54} /> : <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
               <p className="text-xs text-secondary-foreground mt-2">Keyword used: {trend.keyword_used?.trends || "--"}</p>
             </div>
 
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">YouTube Creator Momentum</p>
               <p className="text-sm text-foreground">New videos: 7d <span className="font-semibold">{metric(trend.youtube_counts?.d7)}</span>, 30d <span className="font-semibold">{metric(trend.youtube_counts?.d30)}</span>, 90d <span className="font-semibold">{metric(trend.youtube_counts?.d90)}</span></p>
+              {!(trend.youtube_titles || []).length && <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
               {(trend.youtube_titles || []).slice(0, 2).map((title, idx) => (
                 <p key={`${title}-${idx}`} className="text-xs text-secondary-foreground">- {cleanText(title)}</p>
               ))}
@@ -106,6 +107,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Reddit Discussion Proxy</p>
               <p className="text-sm text-foreground">Posts in 30d: <span className="font-semibold">{metric(trend.reddit_counts?.d30)}</span></p>
               <p className="text-sm text-foreground">Posts in 90d: <span className="font-semibold">{metric(trend.reddit_counts?.d90)}</span></p>
+              {trend.reddit_counts?.d30 == null && trend.reddit_counts?.d90 == null && <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
               <p className="text-xs text-secondary-foreground">Keyword used: {trend.keyword_used?.reddit || "--"}</p>
             </div>
 
@@ -138,12 +140,6 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
               <p className="text-xs text-secondary-foreground">Sparkline points: {metric(trend.rawSignals?.sparklinePoints)}</p>
               <p className="text-xs text-secondary-foreground">Timings (ms): Trends {metric(trend.timings_ms?.trends)}, YouTube {metric(trend.timings_ms?.youtube)}, Reddit {metric(trend.timings_ms?.reddit)}</p>
             </div>
-
-            {trend.partial_data_note && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-xs text-amber-200">
-                {cleanText(trend.partial_data_note)}
-              </div>
-            )}
           </>
         )}
       </div>
