@@ -1,6 +1,6 @@
-import { runRadar } from "../../app/api/_lib/radarCore";
+import { runRadar } from "../_lib/radarCore";
 import { getSampleTrends } from "../_lib/sampleTrends";
-import { validateKeys } from "../../lib/env";
+import { validateKeys } from "../_lib/env";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
