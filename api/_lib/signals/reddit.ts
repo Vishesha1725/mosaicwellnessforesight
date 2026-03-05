@@ -1,5 +1,6 @@
 import { CACHE_TTL_MS, getCache, setCache } from "../cache.js";
 import { fetchWithTimeout } from "../fetchWithTimeout.js";
+import { cleanText } from "../text.js";
 
 export async function fetchRedditSignal(query: string, timeframeDays: number) {
   const cacheKey = `reddit:${query}:${timeframeDays}`;
@@ -26,4 +27,29 @@ export async function fetchRedditSignal(query: string, timeframeDays: number) {
   };
   setCache(cacheKey, normalized, CACHE_TTL_MS.reddit);
   return normalized;
+}
+
+export async function fetchRedditWithFallback(primaryQuery: string, fallbackQueries: string[], timeframeDays: number) {
+  const queue = [primaryQuery, ...(fallbackQueries || [])]
+    .map((q) => cleanText(String(q || "").toLowerCase()))
+    .filter(Boolean);
+
+  for (const query of queue) {
+    try {
+      const signal = await fetchRedditSignal(query, timeframeDays);
+      const valid = Number(signal.mentionCount || 0) > 0;
+      if (valid) {
+        return { ...signal, keywordUsed: query, ok: true as const };
+      }
+    } catch {
+      // continue with fallback query
+    }
+  }
+
+  return {
+    mentionCount: 0,
+    sampleThreads: [] as string[],
+    keywordUsed: cleanText(String(primaryQuery || "").toLowerCase()),
+    ok: false as const,
+  };
 }

@@ -94,7 +94,7 @@ const Index = () => {
       });
 
       if (payload.partialData) {
-        toast.info(`Quick results (some sources skipped): ${payload.partialDataSources.join(", ")}.`, { duration: 5000 });
+        toast.info(`Full scan: Google Trends + YouTube (may take longer). Unavailable: ${payload.partialDataSources.join(", ") || "none"}.`, { duration: 5000 });
       }
 
       if (!payload.liveMode) {

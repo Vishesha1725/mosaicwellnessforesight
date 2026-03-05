@@ -3,8 +3,8 @@ type Entry<T> = { value: T; expiresAt: number };
 const store = new Map<string, Entry<unknown>>();
 
 export const CACHE_TTL_MS = {
-  serpapi: 30 * 60 * 1000,
-  youtube: 15 * 60 * 1000,
+  serpapi: 60 * 60 * 1000,
+  youtube: 30 * 60 * 1000,
   reddit: 15 * 60 * 1000,
 };
 

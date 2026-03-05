@@ -1,5 +1,6 @@
 import { CACHE_TTL_MS, getCache, setCache } from "../cache.js";
 import { fetchWithTimeout } from "../fetchWithTimeout.js";
+import { cleanText } from "../text.js";
 
 export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
   const key = process.env.YOUTUBE_API_KEY || "";
@@ -14,7 +15,7 @@ export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
     `?part=snippet&type=video&order=date&maxResults=15&q=${encodeURIComponent(query)}` +
     `&key=${encodeURIComponent(key)}`;
 
-  const result = await fetchWithTimeout<any>(url, undefined, 3500);
+  const result = await fetchWithTimeout<any>(url, undefined, 8000);
   if (!result.ok) throw new Error(result.timeout ? "youtube_timeout" : "youtube_fetch_failed");
   const data = result.data;
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -35,4 +36,30 @@ export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
   };
   setCache(cacheKey, normalized, CACHE_TTL_MS.youtube);
   return normalized;
+}
+
+export async function fetchYoutubeWithFallback(primaryQuery: string, fallbackQueries: string[], timeframeDays: number) {
+  const queue = [primaryQuery, ...(fallbackQueries || [])]
+    .map((q) => cleanText(String(q || "").toLowerCase()))
+    .filter(Boolean);
+
+  for (const query of queue) {
+    try {
+      const signal = await fetchYoutubeSignal(query, timeframeDays);
+      const valid = Number(signal.recentCount || 0) > 0 || Number(signal.totalResults || 0) > 0;
+      if (valid) {
+        return { ...signal, keywordUsed: query, ok: true as const };
+      }
+    } catch {
+      // continue with fallback query
+    }
+  }
+
+  return {
+    recentCount: 0,
+    sampleTitles: [] as string[],
+    totalResults: 0,
+    keywordUsed: cleanText(String(primaryQuery || "").toLowerCase()),
+    ok: false as const,
+  };
 }

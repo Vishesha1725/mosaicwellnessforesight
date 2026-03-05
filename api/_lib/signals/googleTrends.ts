@@ -1,5 +1,6 @@
 import { CACHE_TTL_MS, getCache, setCache } from "../cache.js";
 import { fetchWithTimeout } from "../fetchWithTimeout.js";
+import { cleanText } from "../text.js";
 
 type SerpOptions = { onNetworkRequest?: () => void };
 
@@ -12,10 +13,19 @@ function toSerpDate(days: number) {
 
 function parseSeries(data: any): number[] {
   const timeline = data?.interest_over_time?.timeline_data || data?.timeline_data || [];
-  if (!Array.isArray(timeline)) return [];
-  return timeline
+  const fromTimeline = Array.isArray(timeline)
+    ? timeline
     .map((item: any) => Number(item?.values?.[0]?.extracted_value ?? item?.value ?? 0) || 0)
-    .filter((x: number) => Number.isFinite(x));
+    .filter((x: number) => Number.isFinite(x))
+    : [];
+  if (fromTimeline.length) return fromTimeline;
+
+  const single =
+    Number(data?.interest_over_time?.averages?.[0] ?? 0) ||
+    Number(data?.interest_over_time?.extracted_value ?? 0) ||
+    0;
+  if (single > 0) return [single, single, single];
+  return [];
 }
 
 function parseRelated(data: any): string[] {
@@ -61,7 +71,7 @@ async function doSerpRequest(query: string, timeframeDays: number, extra: Record
   });
 
   options?.onNetworkRequest?.();
-  const result = await fetchWithTimeout<any>(`https://serpapi.com/search.json?${params.toString()}`, undefined, 4500);
+  const result = await fetchWithTimeout<any>(`https://serpapi.com/search.json?${params.toString()}`, undefined, 10000);
   if (!result.ok) {
     throw new Error(result.timeout ? "google_trends_timeout" : `google_trends_fetch_failed:${result.error || "unknown"}`);
   }
@@ -83,6 +93,38 @@ export async function fetchGoogleTrendsSignal(query: string, timeframeDays: numb
   };
   setCache(cacheKey, normalized, CACHE_TTL_MS.serpapi);
   return normalized;
+}
+
+export async function fetchGoogleTrendsWithFallback(
+  primaryQuery: string,
+  fallbackQueries: string[],
+  timeframeDays: number,
+  options?: SerpOptions
+) {
+  const queue = [primaryQuery, ...(fallbackQueries || [])]
+    .map((q) => cleanText(String(q || "").toLowerCase()))
+    .filter(Boolean);
+
+  for (const query of queue) {
+    try {
+      const signal = await fetchGoogleTrendsSignal(query, timeframeDays, options);
+      const hasSignal = signal.series.length > 0 || Math.abs(Number(signal.growthPct || 0)) > 0;
+      if (hasSignal) {
+        return { ...signal, keywordUsed: query, ok: true as const };
+      }
+    } catch {
+      // continue with fallback query
+    }
+  }
+
+  return {
+    series: [] as number[],
+    growthPct: 0,
+    spikeiness: 100,
+    related: [] as string[],
+    keywordUsed: cleanText(String(primaryQuery || "").toLowerCase()),
+    ok: false as const,
+  };
 }
 
 export async function fetchGoogleRelatedQueries(query: string, timeframeDays: number, options?: SerpOptions): Promise<string[]> {
