@@ -1,3 +1,7 @@
+import { validateKeys } from "../../lib/env";
+import { fetchGoogleTrends } from "../../lib/signals/googleTrends";
+import { fetchYoutubeVideos } from "../../lib/signals/youtube";
+
 export type CategoryName =
   | "Wellness & Supplements"
   | "Functional Beverages"
@@ -297,33 +301,16 @@ function computeDurability(values: number[]): { durability: number; spikeiness: 
   return { durability, spikeiness };
 }
 
-async function fetchSerpApi(params: Record<string, string>): Promise<any> {
-  const apiKey = process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY;
-  if (!apiKey) {
-    throw new Error("missing_SERPAPI_API_KEY");
-  }
-
-  const searchParams = new URLSearchParams({
-    engine: "google_trends",
-    geo: "IN",
-    hl: "en",
-    api_key: apiKey,
-    ...params,
-  });
-
-  const url = `https://serpapi.com/search.json?${searchParams.toString()}`;
-  return safeFetchJson(url);
-}
-
 async function googleInterest(keyword: string, days: number): Promise<TimePoint[]> {
   const key = `gt:interest:${keyword}:${days}`;
   const hit = getCache<TimePoint[]>(key);
   if (hit) return hit;
 
-  const json = await fetchSerpApi({
-    q: keyword,
+  const keys = validateKeys();
+  if (!keys.serpApi) throw new Error("missing_SERPAPI_API_KEY");
+  const json = await fetchGoogleTrends(keyword, {
     date: toSerpDate(days),
-    data_type: "TIMESERIES",
+    dataType: "TIMESERIES",
   });
 
   const timeline = parseTimeline(json);
@@ -336,10 +323,11 @@ async function googleRelatedQueries(anchor: string, days: number): Promise<{ que
   const hit = getCache<{ query: string; score: number }[]>(key);
   if (hit) return hit;
 
-  const json = await fetchSerpApi({
-    q: anchor,
+  const keys = validateKeys();
+  if (!keys.serpApi) throw new Error("missing_SERPAPI_API_KEY");
+  const json = await fetchGoogleTrends(anchor, {
     date: toSerpDate(days),
-    data_type: "RELATED_QUERIES",
+    dataType: "RELATED_QUERIES",
   });
 
   const related = parseRelatedQueries(json);
@@ -357,25 +345,11 @@ async function youtubeSignal(keyword: string): Promise<{
   const hit = getCache<any>(key);
   if (hit) return hit;
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) throw new Error("missing_YOUTUBE_API_KEY");
+  const keys = validateKeys();
+  if (!keys.youtube) throw new Error("missing_YOUTUBE_API_KEY");
 
   const now = Date.now();
-  const publishedAfter = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const params = new URLSearchParams({
-    part: "snippet",
-    type: "video",
-    order: "date",
-    maxResults: "15",
-    q: keyword,
-    publishedAfter,
-    regionCode: "IN",
-    relevanceLanguage: "en",
-    key: apiKey,
-  });
-
-  const json = await safeFetchJson(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
-  const items = Array.isArray(json?.items) ? json.items : [];
+  const items = await fetchYoutubeVideos(keyword);
 
   let d7 = 0;
   let d30 = 0;
@@ -612,9 +586,8 @@ export async function runRadar(input: RunRadarInput): Promise<{
   trends.sort((a, b) => b.trend_score - a.trend_score);
   const results = trends.slice(0, limit);
 
-  const hasSerp = !!(process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY);
-  const hasYoutube = !!process.env.YOUTUBE_API_KEY;
-  const liveMode = hasSerp && hasYoutube;
+  const keys = validateKeys();
+  const liveMode = keys.serpApi && keys.youtube;
 
   return {
     category,

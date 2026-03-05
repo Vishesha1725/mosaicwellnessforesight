@@ -3,11 +3,14 @@ import { TrendData } from "@/data/mockTrends";
 interface RadarRunResponse {
   category: string;
   timeframe: number;
-  results: TrendData[];
+  mode?: "live" | "demo";
+  reason?: string;
+  results?: TrendData[];
+  trends?: TrendData[];
   partialData: boolean;
-  partialDataSources: string[];
-  liveMode: boolean;
-  discoveryCount: number;
+  partialDataSources?: string[];
+  liveMode?: boolean;
+  discoveryCount?: number;
 }
 
 export async function runLiveRadar(params: {
@@ -26,5 +29,14 @@ export async function runLiveRadar(params: {
     throw new Error(text || `Radar run failed (${response.status})`);
   }
 
-  return response.json();
+  const data = (await response.json()) as RadarRunResponse;
+  const normalizedResults = data.results ?? data.trends ?? [];
+  const liveMode = data.liveMode ?? data.mode !== "demo";
+  return {
+    ...data,
+    results: normalizedResults,
+    liveMode,
+    partialDataSources: data.partialDataSources ?? [],
+    discoveryCount: data.discoveryCount ?? normalizedResults.length,
+  };
 }

@@ -63,7 +63,7 @@ const RadarHeader = ({
                     : "bg-warning/10 border-warning/30 text-warning"
                 }`}
               >
-                {dataSource === "serpapi" ? "Live Discovery" : "Demo mode (missing keys / source error)"}
+                {dataSource === "serpapi" ? "Live Data Mode" : "Demo Mode - Missing API Keys"}
               </span>
             )}
           </div>
