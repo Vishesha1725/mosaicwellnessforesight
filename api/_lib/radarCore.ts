@@ -1,6 +1,7 @@
 import { validateKeys } from "./env.js";
 import { fetchGoogleTrends } from "./googleTrends.js";
 import { fetchYoutubeVideos } from "./youtube.js";
+import { buildCalculatedSignals } from "./simulate.js";
 
 export type CategoryName =
   | "Wellness & Supplements"
@@ -33,11 +34,21 @@ export interface DiscoveryTrend {
   why_bullets: string[];
   founder_brief: string;
   format_recommendation: string;
+  market_strength?: number;
   thumbnail_url?: string;
   youtube_titles: string[];
   youtube_counts: { d7: number; d30: number; d90: number };
   reddit_counts: { d30: number; d90: number };
   google_timeline: TimePoint[];
+  sourcesUsed?: string[];
+  rawSignals?: {
+    growthPct?: number;
+    spikeiness?: number;
+    ytRecentCount?: number;
+    redditMentions?: number;
+    sparklinePoints?: number;
+  };
+  queryUsed?: { trends?: string; youtube?: string; reddit?: string };
   partial_data_note?: string;
   velocity: number;
   coherence: number;
@@ -62,7 +73,10 @@ interface RunRadarInput {
   category: CategoryName;
   timeframe: number;
   limit?: number;
+  mode?: "live" | "calc";
 }
+
+export type SourceStatus = "live" | "calc" | "missing";
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
@@ -424,33 +438,47 @@ export async function runRadar(input: RunRadarInput): Promise<{
   results: DiscoveryTrend[];
   partialData: boolean;
   partialDataSources: string[];
-  liveMode: boolean;
+  modeUsed: "live" | "calc";
+  perSourceStatus: {
+    trends: SourceStatus;
+    youtube: SourceStatus;
+    reddit: SourceStatus;
+  };
   discoveryCount: number;
 }> {
   const { category, timeframe } = input;
+  const modeUsed: "live" | "calc" = input.mode === "calc" ? "calc" : "live";
   const limit = Math.max(5, Math.min(10, input.limit ?? 10));
   const anchors = CATEGORY_ANCHORS[category] || [];
 
   const partialDataSources = new Set<string>();
   const candidateMap = new Map<string, { score: number; sourceAnchors: number }>();
+  let trendsLiveSeen = false;
+  let youtubeLiveSeen = false;
+  let redditLiveSeen = false;
 
   for (const anchor of anchors) {
     const normalizedAnchor = cleanTerm(anchor);
     candidateMap.set(normalizedAnchor, { score: 100, sourceAnchors: 1 });
-    try {
-      const related = await googleRelatedQueries(normalizedAnchor, timeframe);
-      for (const rel of related.slice(0, 20)) {
-        if (!isCandidateAllowed(rel.query)) continue;
-        const prev = candidateMap.get(rel.query);
-        if (prev) {
-          prev.score = Math.max(prev.score, rel.score || 0);
-          prev.sourceAnchors += 1;
-        } else {
-          candidateMap.set(rel.query, { score: rel.score || 0, sourceAnchors: 1 });
+    if (modeUsed === "live") {
+      try {
+        const related = await googleRelatedQueries(normalizedAnchor, timeframe);
+        if (related.length > 0) {
+          trendsLiveSeen = true;
         }
+        for (const rel of related.slice(0, 20)) {
+          if (!isCandidateAllowed(rel.query)) continue;
+          const prev = candidateMap.get(rel.query);
+          if (prev) {
+            prev.score = Math.max(prev.score, rel.score || 0);
+            prev.sourceAnchors += 1;
+          } else {
+            candidateMap.set(rel.query, { score: rel.score || 0, sourceAnchors: 1 });
+          }
+        }
+      } catch {
+        partialDataSources.add("Google Trends related queries");
       }
-    } catch {
-      partialDataSources.add("Google Trends related queries");
     }
   }
 
@@ -464,39 +492,76 @@ export async function runRadar(input: RunRadarInput): Promise<{
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates[i];
+    const trendId = `${category.slice(0, 2).toLowerCase()}-${i + 1}`;
+    const calc = modeUsed === "calc" ? buildCalculatedSignals(trendId, timeframe) : null;
 
     let timeline: TimePoint[] = [];
     let growthScore = 0;
     let growthPct = 0;
-    let acceleration = 0;
-    try {
-      timeline = await googleInterest(candidate, timeframe);
-      const growth = computeGrowthScore(timeline.map((t) => t.value));
-      growthScore = growth.growthScore;
-      growthPct = growth.growthPct;
-      acceleration = growth.acceleration;
-    } catch {
-      partialDataSources.add("Google Trends interest over time");
+    if (modeUsed === "calc" && calc) {
+      timeline = calc.timeline.map((value, idx) => ({ date: `P${idx + 1}`, value }));
+      growthScore = calc.growingScore;
+      growthPct = calc.growthPct;
+    } else {
+      try {
+        timeline = await googleInterest(candidate, timeframe);
+        const growth = computeGrowthScore(timeline.map((t) => t.value));
+        growthScore = growth.growthScore;
+        growthPct = growth.growthPct;
+        if (timeline.length > 0) {
+          trendsLiveSeen = true;
+        }
+      } catch {
+        partialDataSources.add("Google Trends interest over time");
+      }
     }
 
     const values = timeline.map((t) => t.value);
-    const { durability, spikeiness } = computeDurability(values);
+    const computedDurability = computeDurability(values);
+    const durability = calc ? calc.willLastScore : computedDurability.durability;
+    const spikeiness = calc ? calc.spikeiness : computedDurability.spikeiness;
 
     let ytMomentum = 0;
     let youtubeCounts = { d7: 0, d30: 0, d90: 0 };
     let youtubeTitles: string[] = [];
     let thumbnail: string | undefined;
-    try {
-      const yt = await youtubeSignal(candidate);
-      ytMomentum = yt.momentum;
-      youtubeCounts = yt.counts;
-      youtubeTitles = yt.titles;
-      thumbnail = yt.thumbnail;
-    } catch {
-      partialDataSources.add("YouTube");
+    if (modeUsed === "calc" && calc) {
+      youtubeCounts = calc.youtubeRecentCount;
+      ytMomentum = clamp((youtubeCounts.d7 * 10 + youtubeCounts.d30 * 6 + youtubeCounts.d90 * 3) / 2);
+      youtubeTitles = [`${toTitleCase(candidate)} explainer`, `${toTitleCase(candidate)} review`];
+    } else {
+      try {
+        const yt = await youtubeSignal(candidate);
+        ytMomentum = yt.momentum;
+        youtubeCounts = yt.counts;
+        youtubeTitles = yt.titles;
+        thumbnail = yt.thumbnail;
+        if (yt.counts.d7 > 0 || yt.counts.d30 > 0 || yt.counts.d90 > 0) {
+          youtubeLiveSeen = true;
+        }
+      } catch {
+        partialDataSources.add("YouTube");
+      }
     }
 
     let redditCounts = { d30: 0, d90: 0 };
+    if (modeUsed === "calc" && calc) {
+      redditCounts = calc.redditMentions;
+    } else {
+      try {
+        const reddit = await redditSignal(candidate);
+        redditCounts = reddit.counts;
+        if (reddit.counts.d30 > 0 || reddit.counts.d90 > 0) {
+          redditLiveSeen = true;
+        }
+      } catch {
+        partialDataSources.add("Reddit");
+      }
+    }
+
+    const marketStrength = clamp(
+      durability * 0.4 + growthScore * 0.3 + ytMomentum * 0.2 + clamp(redditCounts.d30 * 5 + redditCounts.d90 * 2) * 0.1
+    );
 
     const moneyPotential = clamp(MONEY_BASE[category] + growthScore * 0.25 + durability * 0.1);
 
@@ -527,7 +592,7 @@ export async function runRadar(input: RunRadarInput): Promise<{
       classification === "REAL TREND" ? "Early" : classification === "EARLY SIGNAL" ? "Optimal" : "Late";
 
     const trend: DiscoveryTrend = {
-      id: `${category.slice(0, 2).toLowerCase()}-${i + 1}`,
+      id: trendId,
       category,
       trend_name: toTitleCase(candidate),
       trend_score: trendScore,
@@ -542,11 +607,25 @@ export async function runRadar(input: RunRadarInput): Promise<{
       why_bullets: whyBullets,
       founder_brief: buildFounderMemo(category, candidate, classification, growthScore, durability),
       format_recommendation: formatRecommendation,
+      market_strength: marketStrength,
       thumbnail_url: thumbnail,
       youtube_titles: youtubeTitles,
       youtube_counts: youtubeCounts,
       reddit_counts: redditCounts,
       google_timeline: timeline,
+      sourcesUsed: [
+        ...(timeline.length > 0 ? ["trends"] : []),
+        ...(youtubeCounts.d90 > 0 ? ["youtube"] : []),
+        ...(redditCounts.d90 > 0 ? ["reddit"] : []),
+      ],
+      rawSignals: {
+        growthPct: growthPct,
+        spikeiness,
+        ytRecentCount: youtubeCounts.d30,
+        redditMentions: redditCounts.d30,
+        sparklinePoints: timeline.length,
+      },
+      queryUsed: { trends: candidate, youtube: candidate, reddit: candidate },
       partial_data_note: partialDataSources.size
         ? `Partial data used. Missing/limited: ${[...partialDataSources].join(", ")}.`
         : undefined,
@@ -577,9 +656,13 @@ export async function runRadar(input: RunRadarInput): Promise<{
 
   trends.sort((a, b) => b.trend_score - a.trend_score);
   const results = trends.slice(0, limit);
-
-  const keys = validateKeys();
-  const liveMode = keys.serpApi && keys.youtube;
+  const perSourceStatus = modeUsed === "calc"
+    ? { trends: "calc" as SourceStatus, youtube: "calc" as SourceStatus, reddit: "calc" as SourceStatus }
+    : {
+        trends: trendsLiveSeen ? ("live" as SourceStatus) : ("missing" as SourceStatus),
+        youtube: youtubeLiveSeen ? ("live" as SourceStatus) : ("missing" as SourceStatus),
+        reddit: redditLiveSeen ? ("live" as SourceStatus) : ("missing" as SourceStatus),
+      };
 
   return {
     category,
@@ -587,7 +670,8 @@ export async function runRadar(input: RunRadarInput): Promise<{
     results,
     partialData: partialDataSources.size > 0,
     partialDataSources: [...partialDataSources],
-    liveMode,
+    modeUsed,
+    perSourceStatus,
     discoveryCount: candidates.length,
   };
 }

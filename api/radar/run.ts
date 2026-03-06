@@ -6,7 +6,7 @@ import { fetchRedditWithFallback } from "../_lib/signals/reddit.js";
 import { buildPricingAndFormats } from "../_lib/pricing.js";
 import { buildFounderMemo } from "../_lib/founderMemo.js";
 import { svgDataUriForProduct } from "../_lib/imageSvg.js";
-import { getSampleTrends } from "../_lib/sampleTrends.js";
+import { buildCalculatedSignals } from "../_lib/simulate.js";
 import { cleanText } from "../_lib/text.js";
 
 const CATEGORIES = [
@@ -159,8 +159,8 @@ type Row = {
   formats: string[];
   pricing: { trial: [number, number]; monthly: [number, number]; bundle: [number, number] };
   google: { series: number[]; growthPct: number; spikeiness: number; related: string[]; keywordUsed?: string };
-  youtube: { recentCount: number; sampleTitles: string[]; totalResults: number; keywordUsed?: string };
-  reddit: { mentionCount: number; sampleThreads: string[]; keywordUsed?: string };
+  youtube: { recentCount: number; sampleTitles: string[]; totalResults: number; keywordUsed?: string; counts?: { d7: number | null; d30: number | null; d90: number | null } };
+  reddit: { mentionCount: number; sampleThreads: string[]; keywordUsed?: string; counts?: { d30: number | null; d90: number | null } };
   sourcesUsed: string[];
   sourceTimingsMs: { trends: number; youtube: number; reddit: number };
   proofStatus?: string;
@@ -179,37 +179,15 @@ export default async function handler(req: any, res: any) {
     const category = (CATEGORIES.includes(categoryInput as Category) ? categoryInput : CATEGORIES[0]) as Category;
     const timeframeDays = clamp(Number(req.body?.timeframe) || 90, 7, 365);
     const limit = clamp(Number(req.body?.limit) || 8, 5, 10);
+    const modeUsed: "live" | "calc" = req.body?.mode === "calc" ? "calc" : "live";
     const keys = validateKeys();
     const catalog = (CATALOG[category] || []).slice(0, 8);
 
-    if (!keys.serpApi && !keys.youtube) {
-      const sample = getSampleTrends(category).slice(0, 8).map((x) => ({
-        ...x,
-        trend_name: cleanText(x.trend_name),
-        image_data_uri: svgDataUriForProduct(cleanText(x.trend_name), category),
-        thumbnail_url: svgDataUriForProduct(cleanText(x.trend_name), category),
-      }));
-      timingsMs.total = Date.now() - t0;
-      res.status(200).json({
-        mode: "demo",
-        reason: "Missing API keys",
-        category,
-        timeframeDays,
-        candidatesDiscovered: 8,
-        signalsUsed: ["Google Trends", "YouTube", "Reddit"],
-        topPicks: sample.slice(0, 5),
-        results: sample,
-        partialData: true,
-        partialDataSources: ["Google Trends", "YouTube"],
-        liveMode: false,
-        discoveryCount: 8,
-        timingsMs,
-      });
-      return;
-    }
-
     let partialData = false;
     const partialDataSources = new Set<string>();
+    let trendsLiveSeen = false;
+    let youtubeLiveSeen = false;
+    let redditLiveSeen = false;
     const serpLimiter = pLimit(2);
     const rowLimiter = pLimit(4);
     const windowDays = getWindowDays(timeframeDays);
@@ -241,6 +219,39 @@ export default async function handler(req: any, res: any) {
           ]
             .map((k: string) => cleanText(String(k).toLowerCase()))
             .filter(Boolean);
+
+          if (modeUsed === "calc") {
+            const calc = buildCalculatedSignals(row.product.id, timeframeDays);
+            row.google = {
+              series: calc.timeline,
+              growthPct: calc.growthPct,
+              spikeiness: calc.spikeiness,
+              related: [],
+              keywordUsed: primary,
+            };
+            row.youtube = {
+              recentCount: calc.youtubeRecentCount.d30,
+              sampleTitles: [`${cleanText(row.product.name)} review`, `${cleanText(row.product.name)} explainer`],
+              totalResults: calc.youtubeRecentCount.d90 * 900,
+              keywordUsed: primary,
+              counts: {
+                d7: calc.youtubeRecentCount.d7,
+                d30: calc.youtubeRecentCount.d30,
+                d90: calc.youtubeRecentCount.d90,
+              },
+            };
+            row.reddit = {
+              mentionCount: calc.redditMentions.d30,
+              sampleThreads: [],
+              keywordUsed: primary,
+              counts: {
+                d30: calc.redditMentions.d30,
+                d90: calc.redditMentions.d90,
+              },
+            };
+            row.sourcesUsed = ["trends", "youtube", "reddit"];
+            return;
+          }
 
           const trendsTask = (async () => {
             if (!keys.serpApi || !primary) return { ok: false };
@@ -314,6 +325,7 @@ export default async function handler(req: any, res: any) {
               keywordUsed: (gt as any).keywordUsed || primary,
             };
             row.sourcesUsed.push("trends");
+            trendsLiveSeen = true;
           } else {
             partialData = true;
             partialDataSources.add("Google Trends");
@@ -326,8 +338,14 @@ export default async function handler(req: any, res: any) {
               sampleTitles: ((yt as any).sampleTitles || []).map((t: string) => cleanText(t)).slice(0, 2),
               totalResults: Number((yt as any).totalResults || 0),
               keywordUsed: (yt as any).keywordUsed || primary,
+              counts: {
+                d7: windowDays <= 7 ? Number((yt as any).recentCount || 0) : null,
+                d30: windowDays <= 30 ? Number((yt as any).recentCount || 0) : null,
+                d90: Number((yt as any).recentCount || 0),
+              },
             };
             row.sourcesUsed.push("youtube");
+            youtubeLiveSeen = true;
           } else {
             partialData = true;
             partialDataSources.add("YouTube");
@@ -339,8 +357,13 @@ export default async function handler(req: any, res: any) {
               mentionCount: Number((rd as any).mentionCount || 0),
               sampleThreads: ((rd as any).sampleThreads || []).map((t: string) => cleanText(t)).slice(0, 2),
               keywordUsed: (rd as any).keywordUsed || primary,
+              counts: {
+                d30: Number((rd as any).mentionCount || 0),
+                d90: Number((rd as any).mentionCount || 0),
+              },
             };
             row.sourcesUsed.push("reddit");
+            redditLiveSeen = true;
           } else {
             row.reddit.keywordUsed = (rd as any)?.keywordUsed || primary;
           }
@@ -443,13 +466,13 @@ export default async function handler(req: any, res: any) {
         },
         youtube_titles: row.youtube.sampleTitles,
         youtube_counts: {
-          d7: row.youtube.recentCount || null,
-          d30: timeframeDays >= 60 ? row.youtube.recentCount || null : null,
-          d90: timeframeDays >= 180 ? row.youtube.recentCount || null : null,
+          d7: row.youtube.counts?.d7 ?? (row.youtube.recentCount || null),
+          d30: row.youtube.counts?.d30 ?? (timeframeDays >= 60 ? row.youtube.recentCount || null : null),
+          d90: row.youtube.counts?.d90 ?? (timeframeDays >= 180 ? row.youtube.recentCount || null : null),
         },
         reddit_counts: {
-          d30: row.reddit.mentionCount || null,
-          d90: timeframeDays >= 180 ? row.reddit.mentionCount || null : null,
+          d30: row.reddit.counts?.d30 ?? (row.reddit.mentionCount || null),
+          d90: row.reddit.counts?.d90 ?? (timeframeDays >= 180 ? row.reddit.mentionCount || null : null),
         },
         google_trends_data: row.google.series,
         evidence_snippets: [memo.proof, ...memo.whyRealOrFad].map((x: string) => cleanText(x)),
@@ -469,9 +492,9 @@ export default async function handler(req: any, res: any) {
         rawSignals: {
           growthPct: hasTrends ? row.google.growthPct : null,
           spikeiness: hasTrends ? row.google.spikeiness : null,
-          ytRecentCount: hasYoutube ? row.youtube.recentCount : null,
+          ytRecentCount: hasYoutube ? (row.youtube.counts?.d30 ?? row.youtube.recentCount) : null,
           ytTotalResults: hasYoutube ? row.youtube.totalResults : null,
-          redditMentions: hasReddit ? row.reddit.mentionCount : null,
+          redditMentions: hasReddit ? (row.reddit.counts?.d30 ?? row.reddit.mentionCount) : null,
           sparklinePoints: hasTrends ? row.google.series.length : null,
         },
         trendsGrowthPct: hasTrends ? row.google.growthPct : null,
@@ -502,38 +525,31 @@ export default async function handler(req: any, res: any) {
 
     timingsMs.total = Date.now() - t0;
     console.log("[radar] timing", { ...timingsMs, category, timeframeDays });
+    const perSourceStatus = modeUsed === "calc"
+      ? { trends: "calc", youtube: "calc", reddit: "calc" }
+      : {
+          trends: trendsLiveSeen ? "live" : "missing",
+          youtube: youtubeLiveSeen ? "live" : "missing",
+          reddit: redditLiveSeen ? "live" : "missing",
+        };
 
     res.status(200).json({
-      mode: "live",
+      modeUsed,
+      perSourceStatus,
       category,
-      timeframeDays,
+      timeframe: timeframeDays,
       candidatesDiscovered: catalog.length,
       signalsUsed: ["Google Trends", "YouTube", "Reddit"],
       topPicks: sliced.slice(0, 5),
       results: sliced,
       partialData,
       partialDataSources: [...partialDataSources],
-      liveMode: true,
       discoveryCount: catalog.length,
       timingsMs,
     });
   } catch (error: any) {
     timingsMs.total = Date.now() - t0;
     console.log("[radar] failed", { error: error?.message, timingsMs });
-    res.status(200).json({
-      mode: "demo",
-      reason: "Fallback after runtime error",
-      category: req.body?.category || "Wellness & Supplements",
-      timeframeDays: Number(req.body?.timeframe) || 90,
-      candidatesDiscovered: 8,
-      signalsUsed: ["Google Trends", "YouTube", "Reddit"],
-      topPicks: [],
-      results: getSampleTrends(req.body?.category || "Wellness & Supplements"),
-      partialData: true,
-      partialDataSources: ["Google Trends", "YouTube", "Reddit"],
-      liveMode: false,
-      discoveryCount: 8,
-      timingsMs,
-    });
+    res.status(500).json({ error: error?.message || "Radar run failed" });
   }
 }

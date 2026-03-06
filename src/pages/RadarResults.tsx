@@ -5,10 +5,17 @@ import TrendPanel from "@/components/TrendPanel";
 import { TrendData, timeWindows } from "@/data/mockTrends";
 import { cleanText } from "@/lib/text";
 
+type SourceStatus = "live" | "calc" | "missing";
+
 interface RadarState {
   trends: TrendData[];
-  sampleFallback: boolean;
-  dataSource: "serpapi" | "sample";
+  dataSource: "live" | "calc";
+  modeUsed: "live" | "calc";
+  perSourceStatus?: {
+    trends: SourceStatus;
+    youtube: SourceStatus;
+    reddit: SourceStatus;
+  };
   category: string;
   timeWindow: number;
   lastUpdated: string;
@@ -47,16 +54,12 @@ const RadarResults = () => {
   }, [state, navigate]);
   if (!state) return null;
 
-  const { trends, sampleFallback, dataSource, category, timeWindow, lastUpdated, activeSources, discoveryCount, timingsMs } = state;
+  const { trends, dataSource, modeUsed, perSourceStatus, category, timeWindow, lastUpdated, activeSources, discoveryCount, timingsMs } = state;
   const topPicks = useMemo(() => trends.slice(0, 5), [trends]);
   const windowLabel = timeWindows.find((tw) => tw.value === timeWindow)?.label ?? `${timeWindow} Days`;
-  const coverage = useMemo(
-    () => ({
-      trends: trends.some((t) => t.sourcesUsed?.includes("trends")),
-      youtube: trends.some((t) => t.sourcesUsed?.includes("youtube")),
-    }),
-    [trends]
-  );
+  const hasLiveSource =
+    perSourceStatus?.trends === "live" || perSourceStatus?.youtube === "live" || perSourceStatus?.reddit === "live";
+  const cardModeBadge = modeUsed === "calc" ? "CALCULATED" : hasLiveSource ? "LIVE" : null;
 
   return (
     <div className="min-h-screen bg-noise relative overflow-hidden p-4 sm:p-6" style={{ background: "linear-gradient(135deg, hsl(220 20% 6%) 0%, hsl(220 22% 8%) 40%, hsl(240 15% 10%) 100%)" }}>
@@ -64,8 +67,10 @@ const RadarResults = () => {
         <RadarHeader
           category={category}
           timeWindow={timeWindow}
+          mode={modeUsed}
           onCategoryChange={() => {}}
           onTimeWindowChange={() => {}}
+          onModeChange={() => {}}
           onRun={() => navigate("/")}
           isLoading={false}
           lastUpdated={lastUpdated}
@@ -92,15 +97,9 @@ const RadarResults = () => {
             </>
           )}
           <span className="text-border">-</span>
-          <span className="text-muted-foreground">Live data used: Trends {coverage.trends ? "✅" : "❌"} | YouTube {coverage.youtube ? "✅" : "❌"}</span>
+          <span className="text-muted-foreground">Source status: Trends {perSourceStatus?.trends ?? "missing"} | YouTube {perSourceStatus?.youtube ?? "missing"} | Reddit {perSourceStatus?.reddit ?? "missing"}</span>
           <button onClick={() => navigate("/")} className="ml-auto text-primary hover:text-primary/80 font-medium">{"\u2190"} New Scan</button>
         </div>
-
-        {sampleFallback && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 text-sm text-amber-300">
-            Demo mode active: API keys are missing, so live discovery is limited.
-          </div>
-        )}
 
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-foreground">Top Picks (5)</h2>
@@ -115,7 +114,14 @@ const RadarResults = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-foreground leading-tight">{cleanText(trend.trend_name)}</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
+                    <div className="flex items-center gap-1.5">
+                      {cardModeBadge && (
+                        <span className="text-[10px] px-2 py-1 rounded-full border font-semibold bg-violet-500/10 text-violet-300 border-violet-500/30">
+                          {cardModeBadge}
+                        </span>
+                      )}
+                      <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Growing</p><p className="text-sm font-semibold text-foreground">{metric(trend.how_fast_its_growing)}</p></div>
@@ -179,7 +185,13 @@ const RadarResults = () => {
       {selected && (
         <>
           <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 animate-fade-in" onClick={() => setSelected(null)} />
-          <TrendPanel trend={selected.trend} category={category} onClose={() => setSelected(null)} defaultTab={selected.tab} />
+          <TrendPanel
+            trend={selected.trend}
+            category={category}
+            onClose={() => setSelected(null)}
+            defaultTab={selected.tab}
+            perSourceStatus={perSourceStatus}
+          />
         </>
       )}
     </div>

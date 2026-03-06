@@ -9,12 +9,20 @@ interface TrendPanelProps {
   category: string;
   onClose: () => void;
   defaultTab?: "memo" | "proof";
+  perSourceStatus?: {
+    trends: "live" | "calc" | "missing";
+    youtube: "live" | "calc" | "missing";
+    reddit: "live" | "calc" | "missing";
+  };
 }
 
 const metric = (v: number | null | undefined) => (typeof v === "number" ? v : "--");
 const badgeText = (t: TrendData) => (t.proof_status ? "NO DATA" : (t.classification || "EARLY SIGNAL"));
 
-const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPanelProps) => {
+const statusLabel = (status?: "live" | "calc" | "missing") =>
+  status === "live" ? "Live" : status === "calc" ? "Calculated" : "Missing";
+
+const TrendPanel = ({ trend, category, onClose, defaultTab = "memo", perSourceStatus }: TrendPanelProps) => {
   const [tab, setTab] = useState<"memo" | "proof">(defaultTab);
   const [copied, setCopied] = useState(false);
 
@@ -89,13 +97,13 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
         {tab === "proof" && (
           <>
             <div className="glass-card p-4">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Google Trends (India)</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Google Trends (India): {statusLabel(perSourceStatus?.trends)}</p>
               {timeline.length > 0 ? <Sparkline data={timeline} height={54} /> : <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
               <p className="text-xs text-secondary-foreground mt-2">Keyword used: {trend.queryUsed?.trends || trend.keyword_used?.trends || "--"}</p>
             </div>
 
             <div className="glass-card p-4 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">YouTube Creator Momentum</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">YouTube Creator Momentum: {statusLabel(perSourceStatus?.youtube)}</p>
               <p className="text-sm text-foreground">New videos: 7d <span className="font-semibold">{metric(trend.youtube_counts?.d7)}</span>, 30d <span className="font-semibold">{metric(trend.youtube_counts?.d30)}</span>, 90d <span className="font-semibold">{metric(trend.youtube_counts?.d90)}</span></p>
               {!(trend.youtube_titles || []).length && <p className="text-xs text-muted-foreground">No data returned for this query.</p>}
               {(trend.youtube_titles || []).slice(0, 2).map((title, idx) => (
@@ -105,7 +113,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "memo" }: TrendPane
             </div>
 
             <div className="glass-card p-4 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Reddit Discussion Proxy</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Reddit Discussion Proxy: {statusLabel(perSourceStatus?.reddit)}</p>
               <p className="text-sm text-foreground">Posts in 30d: <span className="font-semibold">{metric(trend.reddit_counts?.d30)}</span></p>
               <p className="text-sm text-foreground">Posts in 90d: <span className="font-semibold">{metric(trend.reddit_counts?.d90)}</span></p>
               {trend.reddit_counts?.d30 == null && trend.reddit_counts?.d90 == null && <p className="text-xs text-muted-foreground">No data returned for this query.</p>}

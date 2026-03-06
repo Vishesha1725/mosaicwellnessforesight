@@ -17,10 +17,15 @@ const Index = () => {
   const navigate = useNavigate();
   const [category, setCategory] = useState<string>(categories[0]);
   const [timeWindow, setTimeWindow] = useState(90);
+  const [mode, setMode] = useState<"live" | "calc">(() => {
+    if (typeof window === "undefined") return "live";
+    const stored = window.localStorage.getItem("radar_mode");
+    return stored === "calc" ? "calc" : "live";
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeSources, setActiveSources] = useState<string[]>(["Google Trends", "YouTube"]);
-  const [dataSource, setDataSource] = useState<"serpapi" | "sample" | null>(null);
+  const [dataSource, setDataSource] = useState<"live" | "calc" | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
 
   useEffect(() => {
@@ -53,6 +58,14 @@ const Index = () => {
     );
   };
 
+  const handleModeChange = (v: "live" | "calc") => {
+    setMode(v);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("radar_mode", v);
+    }
+    toast.success(`Mode updated: ${v === "live" ? "Live" : "Calculated"}`, { duration: 1800 });
+  };
+
   const handleRun = async () => {
     if (activeSources.length === 0) return;
     setIsLoading(true);
@@ -63,12 +76,13 @@ const Index = () => {
         category,
         timeframe: timeWindow,
         limit: 10,
+        mode,
       });
 
       const trends = payload.results as TrendData[];
       const ts = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
       setLastUpdated(ts);
-      setDataSource(payload.liveMode ? "serpapi" : "sample");
+      setDataSource(payload.modeUsed ?? mode);
       setIsLoading(false);
 
       navigate("/radar", {
@@ -76,25 +90,20 @@ const Index = () => {
           trends,
           category,
           timeWindow,
+          modeUsed: payload.modeUsed ?? mode,
+          perSourceStatus: payload.perSourceStatus,
           lastUpdated: ts,
           activeSources,
-          sampleFallback: !payload.liveMode,
-          dataSource: payload.liveMode ? "serpapi" : "sample",
+          dataSource: payload.modeUsed ?? mode,
           partialData: payload.partialData,
           partialDataSources: payload.partialDataSources,
           discoveryCount: payload.discoveryCount,
           timingsMs: payload.timingsMs,
         },
       });
-
-      if (!payload.liveMode) {
-        toast.info("Demo mode: API keys missing. Add SERPAPI_API_KEY and YOUTUBE_API_KEY for full live discovery.", {
-          duration: 6000,
-        });
-      }
     } catch (error: any) {
       setIsLoading(false);
-      setDataSource("sample");
+      setDataSource(mode);
       toast.error(error?.message || "Radar failed. Check API routes and environment keys.");
     }
   };
@@ -122,8 +131,10 @@ const Index = () => {
         <RadarHeader
           category={category}
           timeWindow={timeWindow}
+          mode={mode}
           onCategoryChange={handleCategoryChange}
           onTimeWindowChange={handleTimeWindowChange}
+          onModeChange={handleModeChange}
           onRun={handleRun}
           isLoading={isLoading}
           lastUpdated={lastUpdated}

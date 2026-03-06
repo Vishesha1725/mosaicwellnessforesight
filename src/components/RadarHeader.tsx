@@ -8,12 +8,14 @@ import mosaicLogo from "@/assets/mosaic-logo.png";
 interface RadarHeaderProps {
   category: string;
   timeWindow: number;
+  mode: "live" | "calc";
   onCategoryChange: (v: string) => void;
   onTimeWindowChange: (v: number) => void;
+  onModeChange: (v: "live" | "calc") => void;
   onRun: () => void;
   isLoading: boolean;
   lastUpdated: string | null;
-  dataSource?: "serpapi" | "sample" | null;
+  dataSource?: "live" | "calc" | null;
   canRun?: boolean;
   showControls?: boolean;
 }
@@ -21,8 +23,10 @@ interface RadarHeaderProps {
 const RadarHeader = ({
   category,
   timeWindow,
+  mode,
   onCategoryChange,
   onTimeWindowChange,
+  onModeChange,
   onRun,
   isLoading,
   lastUpdated,
@@ -58,12 +62,12 @@ const RadarHeader = ({
             {dataSource && (
               <span
                 className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                  dataSource === "serpapi"
+                  dataSource === "live"
                     ? "bg-primary/10 border-primary/30 text-primary"
                     : "bg-warning/10 border-warning/30 text-warning"
                 }`}
               >
-                {dataSource === "serpapi" ? "Live Data Mode" : "Demo Mode - Missing API Keys"}
+                {dataSource === "live" ? "Live Mode" : "Calculated Mode"}
               </span>
             )}
           </div>
@@ -91,6 +95,16 @@ const RadarHeader = ({
               {timeWindows.map((tw) => (
                 <SelectItem key={tw.value} value={String(tw.value)}>{tw.label}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={mode} onValueChange={(v) => onModeChange(v as "live" | "calc")}>
+            <SelectTrigger className="w-[140px] bg-secondary/50 border-border text-sm h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="live">Live</SelectItem>
+              <SelectItem value="calc">Calculated</SelectItem>
             </SelectContent>
           </Select>
 

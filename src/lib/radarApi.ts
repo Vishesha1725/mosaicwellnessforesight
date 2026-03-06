@@ -3,13 +3,16 @@ import { TrendData } from "@/data/mockTrends";
 interface RadarRunResponse {
   category: string;
   timeframe: number;
-  mode?: "live" | "demo";
-  reason?: string;
+  modeUsed?: "live" | "calc";
   results?: TrendData[];
   trends?: TrendData[];
   partialData: boolean;
   partialDataSources?: string[];
-  liveMode?: boolean;
+  perSourceStatus?: {
+    trends: "live" | "calc" | "missing";
+    youtube: "live" | "calc" | "missing";
+    reddit: "live" | "calc" | "missing";
+  };
   discoveryCount?: number;
   candidatesDiscovered?: number;
   topPicks?: TrendData[];
@@ -20,6 +23,7 @@ export async function runLiveRadar(params: {
   category: string;
   timeframe: number;
   limit?: number;
+  mode: "live" | "calc";
 }): Promise<RadarRunResponse> {
   const response = await fetch("/api/radar/run", {
     method: "POST",
@@ -34,11 +38,15 @@ export async function runLiveRadar(params: {
 
   const data = (await response.json()) as RadarRunResponse;
   const normalizedResults = data.results ?? data.trends ?? [];
-  const liveMode = data.liveMode ?? data.mode !== "demo";
   return {
     ...data,
     results: normalizedResults,
-    liveMode,
+    modeUsed: data.modeUsed ?? params.mode,
+    perSourceStatus: data.perSourceStatus ?? {
+      trends: params.mode === "calc" ? "calc" : "missing",
+      youtube: params.mode === "calc" ? "calc" : "missing",
+      reddit: params.mode === "calc" ? "calc" : "missing",
+    },
     partialDataSources: data.partialDataSources ?? [],
     discoveryCount: data.discoveryCount ?? data.candidatesDiscovered ?? normalizedResults.length,
   };
