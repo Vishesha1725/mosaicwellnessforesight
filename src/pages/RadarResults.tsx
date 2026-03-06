@@ -146,10 +146,9 @@ const RadarResults = () => {
                       Trial {fmtINR(trend.pricing.trial[0])}-{fmtINR(trend.pricing.trial[1])} | Monthly {fmtINR(trend.pricing.monthly[0])}-{fmtINR(trend.pricing.monthly[1])} | Bundle {fmtINR(trend.pricing.bundle[0])}-{fmtINR(trend.pricing.bundle[1])}
                     </p>
                   )}
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setSelected({ trend, tab: "brief" })} className="flex-1 rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2 text-xs font-semibold">Founder Memo</button>
-                    <button onClick={() => setSelected({ trend, tab: "signals" })} className="flex-1 rounded-lg border border-border bg-secondary/40 text-foreground px-3 py-2 text-xs font-semibold">See Proof</button>
-                  </div>
+                  <button onClick={() => setSelected({ trend, tab: "signals" })} className="w-full rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2 text-xs font-semibold hover:bg-primary/15 transition-colors">
+                    Full Brief
+                  </button>
                 </div>
               </article>
             ))}
@@ -170,10 +169,8 @@ const RadarResults = () => {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Market Strength {fmtInt(trend.market_strength)}/100 - TAM {fmtINR(trend.tam_estimate_cr)} - ROI {fmt2(trend.roi_estimate_x)}x</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => setSelected({ trend, tab: "brief" })} className="text-xs text-primary font-medium">Founder Memo</button>
-                    <span className="text-muted-foreground text-xs">|</span>
-                    <button onClick={() => setSelected({ trend, tab: "signals" })} className="text-xs text-primary font-medium">See Proof</button>
+                  <div className="mt-2">
+                    <button onClick={() => setSelected({ trend, tab: "signals" })} className="text-xs text-primary font-medium">Full Brief</button>
                   </div>
                 </div>
               </div>

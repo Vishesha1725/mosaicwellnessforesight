@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { TrendData } from "@/data/mockTrends";
 import { cleanText } from "@/lib/text";
 import { fmt1, fmt2, fmtINR, fmtInt } from "@/lib/format";
@@ -31,10 +30,6 @@ const computeAcceleration = (series: number[]): number | null => {
   return secondSlope - firstSlope;
 };
 
-const interpolate = (start: number, end: number, t: number) => start + (end - start) * t;
-
-const normalize = (value: number, max: number) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-
 const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourceStatus, modeUsed = "live" }: TrendPanelProps) => {
   const [tab, setTab] = useState<"signals" | "market" | "roi" | "brief">(defaultTab);
 
@@ -44,33 +39,6 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
   const growthPct = trend.rawSignals?.growthPct ?? trend.trendsGrowthPct ?? null;
   const acceleration = computeAcceleration(googleSeries);
   const latestIndex = googleSeries.length ? googleSeries[googleSeries.length - 1] : null;
-
-  const secondarySource: "youtube" | "reddit" = trend.youtube_counts?.d90 != null || trend.youtube_counts?.d30 != null || trend.youtube_counts?.d7 != null ? "youtube" : "reddit";
-  const yD7 = secondarySource === "youtube" ? (trend.youtube_counts?.d7 ?? trend.youtubeRecentCount ?? null) : null;
-  const yD30 = secondarySource === "youtube" ? (trend.youtube_counts?.d30 ?? trend.youtubeRecentCount ?? null) : (trend.reddit_counts?.d30 ?? null);
-  const yD90 = secondarySource === "youtube" ? (trend.youtube_counts?.d90 ?? trend.youtubeRecentCount ?? null) : (trend.reddit_counts?.d90 ?? trend.reddit_counts?.d30 ?? null);
-
-  const chartData = useMemo(() => {
-    const length = Math.max(googleSeries.length, 8);
-    const d90 = yD90 ?? 0;
-    const d30 = yD30 ?? d90;
-    const d7 = yD7 ?? d30;
-    const maxSecondary = Math.max(d90, d30, d7, 1);
-    return Array.from({ length }, (_, i) => {
-      const t = length === 1 ? 1 : i / (length - 1);
-      let secondaryValue = 0;
-      if (t <= 0.66) {
-        secondaryValue = interpolate(d90, d30, t / 0.66);
-      } else {
-        secondaryValue = interpolate(d30, d7, (t - 0.66) / 0.34);
-      }
-      return {
-        idx: i + 1,
-        google: googleSeries[i] ?? googleSeries[googleSeries.length - 1] ?? null,
-        secondary: normalize(secondaryValue, maxSecondary),
-      };
-    });
-  }, [googleSeries, yD7, yD30, yD90]);
 
   const founderBlocks = useMemo(() => {
     if (trend.founder_memo) {
@@ -121,47 +89,20 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
         {tab === "signals" && (
           <>
-            <div className="glass-card p-4 space-y-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Signal Velocity</p>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.3)" />
-                    <XAxis dataKey="idx" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} domain={[0, 100]} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 10,
-                        color: "hsl(var(--foreground))",
-                      }}
-                    />
-                    <Line type="monotone" dataKey="google" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
-                    <Line type="monotone" dataKey="secondary" stroke="#22c55e" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="text-secondary-foreground"><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Google Trends</span>
-                <span className="text-secondary-foreground"><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" />{secondarySource === "youtube" ? "YouTube Momentum" : "Reddit Momentum"}</span>
-              </div>
-            </div>
-
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Google Trends Evidence ({statusLabel(perSourceStatus?.trends)})</p>
-              <p className="text-sm text-foreground">Growth: <span className="font-semibold">{toPercent(growthPct)}</span></p>
-              <p className="text-sm text-foreground">Acceleration: <span className="font-semibold">{acceleration == null ? "--" : toPercent(acceleration)}</span></p>
-              <p className="text-sm text-foreground">Latest Index: <span className="font-semibold">{fmtInt(latestIndex)}</span></p>
+              <p className="text-sm text-foreground">Growth: <span className="font-semibold">{growthPct == null ? "Not available" : toPercent(growthPct)}</span></p>
+              <p className="text-sm text-foreground">Acceleration: <span className="font-semibold">{acceleration == null ? "Not available" : toPercent(acceleration)}</span></p>
+              <p className="text-sm text-foreground">Latest Index: <span className="font-semibold">{latestIndex == null ? "Not available" : fmtInt(latestIndex)}</span></p>
             </div>
 
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">YouTube Evidence ({statusLabel(perSourceStatus?.youtube)})</p>
-              <p className="text-sm text-foreground">New videos: 7d <span className="font-semibold">{fmtInt(trend.youtube_counts?.d7)}</span>, 30d <span className="font-semibold">{fmtInt(trend.youtube_counts?.d30)}</span>, 90d <span className="font-semibold">{fmtInt(trend.youtube_counts?.d90)}</span></p>
+              <p className="text-sm text-foreground">New videos: 7d <span className="font-semibold">{trend.youtube_counts?.d7 == null ? "Not available" : fmtInt(trend.youtube_counts?.d7)}</span>, 30d <span className="font-semibold">{trend.youtube_counts?.d30 == null ? "Not available" : fmtInt(trend.youtube_counts?.d30)}</span>, 90d <span className="font-semibold">{trend.youtube_counts?.d90 == null ? "Not available" : fmtInt(trend.youtube_counts?.d90)}</span></p>
               {(trend.youtube_titles || []).slice(0, 2).map((title, idx) => (
                 <p key={`${title}-${idx}`} className="text-xs text-secondary-foreground">- {cleanText(title)}</p>
               ))}
-              {!(trend.youtube_titles || []).length && <p className="text-xs text-muted-foreground">--</p>}
+              {!(trend.youtube_titles || []).length && <p className="text-xs text-muted-foreground">Not available</p>}
             </div>
           </>
         )}
@@ -170,12 +111,12 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
           <div className="space-y-4">
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">TAM (Estimated)</p>
-              <p className="text-2xl font-bold text-foreground">{fmtINR(trend.tam_estimate_cr)}</p>
+              <p className="text-2xl font-bold text-foreground">{trend.tam_estimate_cr == null ? "Not available" : fmtINR(trend.tam_estimate_cr)}</p>
             </div>
             <div className="glass-card p-4 space-y-2">
-              <p className="text-sm text-foreground">Market Strength: <span className="font-semibold">{fmtInt(trend.market_strength)}</span></p>
-              <p className="text-sm text-foreground">Competition Proxy: <span className="font-semibold">{fmtInt(trend.competition)}</span></p>
-              <p className="text-sm text-foreground">Fad Risk: <span className="font-semibold">{trend.fad_risk_label ?? fmtInt(trend.fad_risk)}</span></p>
+              <p className="text-sm text-foreground">Market Strength: <span className="font-semibold">{trend.market_strength == null ? "Not available" : fmtInt(trend.market_strength)}</span></p>
+              <p className="text-sm text-foreground">Competition Proxy: <span className="font-semibold">{trend.competition == null ? "Not available" : fmtInt(trend.competition)}</span></p>
+              <p className="text-sm text-foreground">Fad Risk: <span className="font-semibold">{trend.fad_risk_label ?? (trend.fad_risk == null ? "Not available" : fmtInt(trend.fad_risk))}</span></p>
             </div>
           </div>
         )}
@@ -183,9 +124,9 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
         {tab === "roi" && (
           <div className="space-y-4">
             <div className="glass-card p-4 space-y-2">
-              <p className="text-sm text-foreground">CAC (Estimated): <span className="font-semibold">{fmtINR(trend.cac_estimate_inr)}</span></p>
-              <p className="text-sm text-foreground">ROI Estimate: <span className="font-semibold">{fmt2(trend.roi_estimate_x)}x</span></p>
-              <p className="text-sm text-foreground">Margin Assumption: <span className="font-semibold">{cleanText(trend.margin_band || "--")}</span></p>
+              <p className="text-sm text-foreground">CAC (Estimated): <span className="font-semibold">{trend.cac_estimate_inr == null ? "Not available" : fmtINR(trend.cac_estimate_inr)}</span></p>
+              <p className="text-sm text-foreground">ROI Estimate: <span className="font-semibold">{trend.roi_estimate_x == null ? "Not available" : `${fmt2(trend.roi_estimate_x)}x`}</span></p>
+              <p className="text-sm text-foreground">Margin Assumption: <span className="font-semibold">{trend.margin_band ? cleanText(trend.margin_band) : "Not available"}</span></p>
             </div>
             <div className="glass-card p-4 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pricing Bands</p>
@@ -196,7 +137,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
                   <p className="text-sm text-foreground">Bundle: <span className="font-semibold">{fmtINR(trend.pricing.bundle[0])}-{fmtINR(trend.pricing.bundle[1])}</span></p>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">--</p>
+                <p className="text-sm text-muted-foreground">Not available</p>
               )}
             </div>
           </div>
@@ -209,7 +150,7 @@ const TrendPanel = ({ trend, category, onClose, defaultTab = "signals", perSourc
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cleanText(block.title)}</p>
                 {block.items.length ? block.items.map((item, i) => (
                   <p key={`${block.title}-${i}`} className="text-sm text-secondary-foreground leading-relaxed">- {cleanText(item)}</p>
-                )) : <p className="text-sm text-muted-foreground">--</p>}
+                )) : <p className="text-sm text-muted-foreground">Not available</p>}
               </div>
             ))}
           </div>

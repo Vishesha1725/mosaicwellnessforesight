@@ -112,3 +112,10 @@
     @apply h-1.5 rounded-full transition-all duration-700 ease-out;
   }
 }
+
+/* hide any Lovable badge/overlay */
+[class*="lovable"], [id*="lovable"], a[href*="lovable"], img[alt*="Lovable"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
