@@ -4,6 +4,7 @@ import EntryBadge from "./EntryBadge";
 import Sparkline from "./Sparkline";
 import { ArrowRight } from "lucide-react";
 import { GoogleTrendsResult } from "@/lib/googleTrends";
+import { fmt1 } from "@/lib/format";
 
 interface TopOpportunityProps {
   trend: TrendData;
@@ -111,7 +112,7 @@ const TopOpportunity = ({ trend, onViewBrief, googleTrends }: TopOpportunityProp
             </div>
             <div className="text-right shrink-0">
               <span className={`font-mono text-sm font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
-                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{Math.abs(googleTrends.growth_pct)}%
+                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{fmt1(Math.abs(googleTrends.growth_pct))}%
               </span>
               <p className="text-[10px] text-muted-foreground">Search growth (India)</p>
             </div>

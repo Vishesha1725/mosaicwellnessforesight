@@ -4,6 +4,7 @@ import MeterBar from "./MeterBar";
 import Sparkline from "./Sparkline";
 import { TrendData } from "@/data/mockTrends";
 import { GoogleTrendsResult } from "@/lib/googleTrends";
+import { fmt1 } from "@/lib/format";
 
 interface TrendCardProps {
   trend: TrendData;
@@ -50,7 +51,7 @@ const TrendCard = ({ trend, rank, onClick, googleTrends }: TrendCardProps) => {
             </div>
             <div className="text-right shrink-0">
               <span className={`font-mono text-xs font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
-                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{Math.abs(googleTrends.growth_pct)}%
+                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{fmt1(Math.abs(googleTrends.growth_pct))}%
               </span>
               <p className="text-[9px] text-muted-foreground">Search (India)</p>
             </div>

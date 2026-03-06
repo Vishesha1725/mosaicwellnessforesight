@@ -4,6 +4,7 @@ import RadarHeader from "@/components/RadarHeader";
 import TrendPanel from "@/components/TrendPanel";
 import { TrendData, timeWindows } from "@/data/mockTrends";
 import { cleanText } from "@/lib/text";
+import { fmtInt, fmt2, fmtINR } from "@/lib/format";
 
 type SourceStatus = "live" | "calc" | "missing";
 
@@ -40,14 +41,13 @@ const placeholderGradients = [
   "linear-gradient(135deg, hsl(32 55% 32%) 0%, hsl(10 35% 18%) 100%)",
 ];
 
-const metric = (v: number | null | undefined) => (typeof v === "number" ? v : "--");
 const badgeText = (t: TrendData) => (t.proof_status ? "NO DATA" : t.classification || "EARLY SIGNAL");
 
 const RadarResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as RadarState | null;
-  const [selected, setSelected] = useState<{ trend: TrendData; tab: "memo" | "proof" } | null>(null);
+  const [selected, setSelected] = useState<{ trend: TrendData; tab: "signals" | "market" | "roi" | "brief" } | null>(null);
 
   useEffect(() => {
     if (!state) navigate("/", { replace: true });
@@ -124,14 +124,14 @@ const RadarResults = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Growing</p><p className="text-sm font-semibold text-foreground">{metric(trend.how_fast_its_growing)}</p></div>
-                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Will Last</p><p className="text-sm font-semibold text-foreground">{metric(trend.will_it_last)}</p></div>
-                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Market Strength</p><p className="text-sm font-semibold text-foreground">{metric(trend.market_strength)}</p></div>
+                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Growing</p><p className="text-sm font-semibold text-foreground">{fmtInt(trend.how_fast_its_growing)}</p></div>
+                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Will Last</p><p className="text-sm font-semibold text-foreground">{fmtInt(trend.will_it_last)}</p></div>
+                    <div className="glass-card p-2"><p className="text-[10px] text-muted-foreground">Market Strength</p><p className="text-sm font-semibold text-foreground">{fmtInt(trend.market_strength)}</p></div>
                   </div>
                   {trend.proof_status && <p className="text-xs text-slate-300">{cleanText(trend.proof_status)}</p>}
                   <div className="glass-card p-2 text-[11px] text-muted-foreground leading-relaxed">
-                    <p>TAM: <span className="text-foreground font-semibold">INR {metric(trend.tam_estimate_cr)} Cr (est)</span></p>
-                    <p>CAC: <span className="text-foreground font-semibold">INR {metric(trend.cac_estimate_inr)} (est)</span> | ROI: <span className="text-foreground font-semibold">{metric(trend.roi_estimate_x)}x (est)</span></p>
+                    <p>TAM: <span className="text-foreground font-semibold">{fmtINR(trend.tam_estimate_cr)} (est)</span></p>
+                    <p>CAC: <span className="text-foreground font-semibold">{fmtINR(trend.cac_estimate_inr)} (est)</span> | ROI: <span className="text-foreground font-semibold">{fmt2(trend.roi_estimate_x)}x (est)</span></p>
                     <p>Fad Risk: <span className="text-foreground font-semibold">{trend.fad_risk_label ?? "Medium"}</span></p>
                   </div>
                   {!!trend.formats?.length && (
@@ -143,12 +143,12 @@ const RadarResults = () => {
                   )}
                   {trend.pricing && (
                     <p className="text-[11px] text-muted-foreground">
-                      Trial INR {trend.pricing.trial[0]}-{trend.pricing.trial[1]} | Monthly INR {trend.pricing.monthly[0]}-{trend.pricing.monthly[1]} | Bundle INR {trend.pricing.bundle[0]}-{trend.pricing.bundle[1]}
+                      Trial {fmtINR(trend.pricing.trial[0])}-{fmtINR(trend.pricing.trial[1])} | Monthly {fmtINR(trend.pricing.monthly[0])}-{fmtINR(trend.pricing.monthly[1])} | Bundle {fmtINR(trend.pricing.bundle[0])}-{fmtINR(trend.pricing.bundle[1])}
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setSelected({ trend, tab: "memo" })} className="flex-1 rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2 text-xs font-semibold">Founder Memo</button>
-                    <button onClick={() => setSelected({ trend, tab: "proof" })} className="flex-1 rounded-lg border border-border bg-secondary/40 text-foreground px-3 py-2 text-xs font-semibold">See Proof</button>
+                    <button onClick={() => setSelected({ trend, tab: "brief" })} className="flex-1 rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2 text-xs font-semibold">Founder Memo</button>
+                    <button onClick={() => setSelected({ trend, tab: "signals" })} className="flex-1 rounded-lg border border-border bg-secondary/40 text-foreground px-3 py-2 text-xs font-semibold">See Proof</button>
                   </div>
                 </div>
               </article>
@@ -169,11 +169,11 @@ const RadarResults = () => {
                     <p className="font-semibold text-sm text-foreground truncate">{cleanText(trend.trend_name)}</p>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeClass[badgeText(trend)]}`}>{badgeText(trend)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Market Strength {metric(trend.market_strength)}/100 - TAM INR {metric(trend.tam_estimate_cr)} Cr - ROI {metric(trend.roi_estimate_x)}x</p>
+                  <p className="text-xs text-muted-foreground mt-1">Market Strength {fmtInt(trend.market_strength)}/100 - TAM {fmtINR(trend.tam_estimate_cr)} - ROI {fmt2(trend.roi_estimate_x)}x</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => setSelected({ trend, tab: "memo" })} className="text-xs text-primary font-medium">Founder Memo</button>
+                    <button onClick={() => setSelected({ trend, tab: "brief" })} className="text-xs text-primary font-medium">Founder Memo</button>
                     <span className="text-muted-foreground text-xs">|</span>
-                    <button onClick={() => setSelected({ trend, tab: "proof" })} className="text-xs text-primary font-medium">See Proof</button>
+                    <button onClick={() => setSelected({ trend, tab: "signals" })} className="text-xs text-primary font-medium">See Proof</button>
                   </div>
                 </div>
               </div>
@@ -190,6 +190,7 @@ const RadarResults = () => {
             category={category}
             onClose={() => setSelected(null)}
             defaultTab={selected.tab}
+            modeUsed={modeUsed}
             perSourceStatus={perSourceStatus}
           />
         </>
