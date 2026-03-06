@@ -4,11 +4,20 @@ export function buildFounderMemo(input: {
   classification: "REAL TREND" | "EARLY SIGNAL" | "FAD";
   formats: string[];
   pricing: { trial: [number, number]; monthly: [number, number]; bundle: [number, number] };
-  metrics: { growthPct: number; recentCount: number; mentionCount: number; marketStrength: number; fadRiskLabel: string };
+  metrics: {
+    growthMomentum: number;
+    growthDescriptor: string;
+    recentCount: number | null;
+    mentionCount: number | null;
+    marketStrength: number;
+    fadRiskLabel: string;
+  };
 }) {
+  const fmtInt = (n: number | null | undefined) => (typeof n === "number" && Number.isFinite(n) ? Math.round(n).toLocaleString("en-IN") : "--");
+  const fmtINR = (n: number) => `INR ${Math.round(n).toLocaleString("en-IN")}`;
   const { productName, category, classification, formats, pricing, metrics } = input;
-  const whatHappening = `${productName} is showing ${metrics.marketStrength}/100 market strength in ${category}. Interest is building and creators are beginning to publish around this format.`;
-  const proof = `Google growth: ${metrics.growthPct}% | YouTube recent videos: ${metrics.recentCount} | Reddit mentions: ${metrics.mentionCount}`;
+  const whatHappening = `${productName} is showing ${fmtInt(metrics.marketStrength)}/100 market strength in ${category}. Interest is building and creators are beginning to publish around this format.`;
+  const proof = `Upward Momentum: ${fmtInt(metrics.growthMomentum)}/100 (${metrics.growthDescriptor}) | YouTube recent videos: ${fmtInt(metrics.recentCount)} | Reddit mentions: ${fmtInt(metrics.mentionCount)}`;
   const why = [
     `Classification: ${classification} based on growth consistency and source spread.`,
     `Fad risk is ${metrics.fadRiskLabel}.`,
@@ -33,7 +42,7 @@ export function buildFounderMemo(input: {
     proof,
     whyRealOrFad: why,
     productWedge: wedge,
-    formatsAndPricing: `Formats: ${formats.join(" / ")} | Trial INR ${pricing.trial[0]}-${pricing.trial[1]}, Monthly INR ${pricing.monthly[0]}-${pricing.monthly[1]}, Bundle INR ${pricing.bundle[0]}-${pricing.bundle[1]}`,
+    formatsAndPricing: `Formats: ${formats.join(" / ")} | Trial ${fmtINR(pricing.trial[0])}-${fmtINR(pricing.trial[1])}, Monthly ${fmtINR(pricing.monthly[0])}-${fmtINR(pricing.monthly[1])}, Bundle ${fmtINR(pricing.bundle[0])}-${fmtINR(pricing.bundle[1])}`,
     gtmIndia: gtm,
     risksAndFixes: risks,
     ninetyDayPlan,

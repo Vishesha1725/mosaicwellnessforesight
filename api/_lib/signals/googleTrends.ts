@@ -40,9 +40,10 @@ function parseRelated(data: any): string[] {
 
 function calcGrowthPct(series: number[]) {
   if (series.length < 2) return 0;
-  const first = Math.max(series[0], 1);
+  const first = Math.max(series[0], 0);
   const last = series[series.length - 1];
-  return Math.round(((last - first) / first) * 100);
+  const safePct = ((last - first) / Math.max(first, 10)) * 100;
+  return Math.round(Math.max(-200, Math.min(500, safePct)));
 }
 
 function calcSpikeiness(series: number[]) {

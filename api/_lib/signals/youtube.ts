@@ -21,18 +21,38 @@ export async function fetchYoutubeSignal(query: string, timeframeDays: number) {
   const items = Array.isArray(data?.items) ? data.items : [];
 
   const now = Date.now();
-  const window = Math.max(7, timeframeDays);
-  const recentCount = items.filter((item: any) => {
-    const published = Date.parse(item?.snippet?.publishedAt || "");
-    if (!Number.isFinite(published)) return false;
-    const ageDays = (now - published) / (24 * 60 * 60 * 1000);
-    return ageDays <= window;
-  }).length;
+  const datedItems = items
+    .map((item: any) => {
+      const published = Date.parse(item?.snippet?.publishedAt || "");
+      return { item, published };
+    })
+    .filter((x: any) => Number.isFinite(x.published));
+
+  const hasValidDates = datedItems.length > 0;
+  const countInWindow = (days: number) =>
+    datedItems.filter((x: any) => ((now - x.published) / (24 * 60 * 60 * 1000)) <= days).length;
+
+  const counts = hasValidDates
+    ? {
+        d7: countInWindow(7),
+        d30: countInWindow(30),
+        d90: countInWindow(90),
+      }
+    : { d7: null, d30: null, d90: null };
+
+  const recentCount =
+    timeframeDays >= 90
+      ? Number(counts.d90 || 0)
+      : timeframeDays >= 30
+      ? Number(counts.d30 || 0)
+      : Number(counts.d7 || 0);
 
   const normalized = {
     recentCount,
-    sampleTitles: items.map((x: any) => x?.snippet?.title).filter(Boolean).slice(0, 2),
+    sampleTitles: datedItems.map((x: any) => x?.item?.snippet?.title).filter(Boolean).slice(0, 2),
     totalResults: Number(data?.pageInfo?.totalResults || 0),
+    counts,
+    hasValidDates,
   };
   setCache(cacheKey, normalized, CACHE_TTL_MS.youtube);
   return normalized;
@@ -46,7 +66,7 @@ export async function fetchYoutubeWithFallback(primaryQuery: string, fallbackQue
   for (const query of queue) {
     try {
       const signal = await fetchYoutubeSignal(query, timeframeDays);
-      const valid = Number(signal.recentCount || 0) > 0 || Number(signal.totalResults || 0) > 0;
+      const valid = Boolean(signal.hasValidDates);
       if (valid) {
         return { ...signal, keywordUsed: query, ok: true as const };
       }
@@ -59,6 +79,8 @@ export async function fetchYoutubeWithFallback(primaryQuery: string, fallbackQue
     recentCount: 0,
     sampleTitles: [] as string[],
     totalResults: 0,
+    counts: { d7: null, d30: null, d90: null },
+    hasValidDates: false,
     keywordUsed: cleanText(String(primaryQuery || "").toLowerCase()),
     ok: false as const,
   };

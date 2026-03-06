@@ -50,8 +50,8 @@ const TrendCard = ({ trend, rank, onClick, googleTrends }: TrendCardProps) => {
               <Sparkline data={googleTrends.timeline} height={28} />
             </div>
             <div className="text-right shrink-0">
-              <span className={`font-mono text-xs font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
-                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{fmt1(Math.abs(googleTrends.growth_pct))}%
+              <span className="font-mono text-xs font-semibold text-success">
+                +{fmt1(Math.abs(googleTrends.growth_pct))}%
               </span>
               <p className="text-[9px] text-muted-foreground">Search (India)</p>
             </div>
@@ -78,3 +78,5 @@ const TrendCard = ({ trend, rank, onClick, googleTrends }: TrendCardProps) => {
 };
 
 export default TrendCard;
+
+

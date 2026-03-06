@@ -111,8 +111,8 @@ const TopOpportunity = ({ trend, onViewBrief, googleTrends }: TopOpportunityProp
               <Sparkline data={googleTrends.timeline} height={36} />
             </div>
             <div className="text-right shrink-0">
-              <span className={`font-mono text-sm font-semibold ${googleTrends.growth_pct > 0 ? "text-success" : "text-warning"}`}>
-                {googleTrends.growth_pct > 0 ? "↑" : "↓"}{fmt1(Math.abs(googleTrends.growth_pct))}%
+              <span className="font-mono text-sm font-semibold text-success">
+                +{fmt1(Math.abs(googleTrends.growth_pct))}%
               </span>
               <p className="text-[10px] text-muted-foreground">Search growth (India)</p>
             </div>
@@ -167,3 +167,5 @@ const TopOpportunity = ({ trend, onViewBrief, googleTrends }: TopOpportunityProp
 };
 
 export default TopOpportunity;
+
+

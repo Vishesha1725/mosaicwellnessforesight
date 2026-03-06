@@ -34,6 +34,13 @@ export interface TrendData {
   sourcesUsed?: string[];
   rawSignals?: {
     growthPct?: number | null;
+    upwardMomentum?: number | null;
+    growthDeltaPoints?: number | null;
+    growthMode?: "percent" | "points" | null;
+    growthCapped?: boolean | null;
+    growthNote?: string | null;
+    latestIndex?: number | null;
+    acceleration?: number | null;
     spikeiness?: number | null;
     ytRecentCount?: number | null;
     ytTotalResults?: number | null;

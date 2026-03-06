@@ -47,6 +47,15 @@ function getWindowDays(timeframeDays: number) {
   return 7;
 }
 
+function applyYoutubeWindows(
+  counts: { d7: number | null; d30: number | null; d90: number | null },
+  timeframeDays: number
+) {
+  if (timeframeDays >= 180) return { d7: null, d30: counts.d30, d90: counts.d90 };
+  if (timeframeDays >= 60) return { d7: counts.d7, d30: counts.d30, d90: null };
+  return { d7: counts.d7, d30: null, d90: null };
+}
+
 function mean(values: number[]) {
   if (!values.length) return 0;
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -56,6 +65,81 @@ function std(values: number[]) {
   if (values.length < 2) return 0;
   const m = mean(values);
   return Math.sqrt(values.reduce((acc, v) => acc + (v - m) ** 2, 0) / values.length);
+}
+
+type GoogleMeta = {
+  growthMomentum: number;
+  safeGrowthPct: number | null;
+  growthDeltaPoints: number | null;
+  growthMode: "percent" | "points";
+  growthCapped: boolean;
+  growthNote?: string;
+  latestIndex: number | null;
+  acceleration: number | null;
+};
+
+function computeGoogleMeta(seriesRaw: number[]): GoogleMeta {
+  const series = (seriesRaw || [])
+    .map((v) => clamp(Number(v) || 0, 0, 100))
+    .filter((v) => Number.isFinite(v));
+
+  if (!series.length) {
+    return {
+      growthMomentum: 0,
+      safeGrowthPct: null,
+      growthDeltaPoints: null,
+      growthMode: "points",
+      growthCapped: false,
+      latestIndex: null,
+      acceleration: null,
+    };
+  }
+
+  const latestIndex = clamp(Math.round(series[series.length - 1]), 0, 100);
+  if (series.length < 2) {
+    return {
+      growthMomentum: 0,
+      safeGrowthPct: null,
+      growthDeltaPoints: null,
+      growthMode: "points",
+      growthCapped: false,
+      latestIndex,
+      acceleration: null,
+    };
+  }
+
+  const recent = series.slice(-Math.min(12, series.length));
+  const deltas = recent.slice(1).map((v, i) => v - recent[i]);
+  const positiveMomentum = deltas.reduce((sum, d) => sum + Math.max(0, d), 0);
+  const growthMomentum = clamp(Math.round(positiveMomentum * 2), 0, 100);
+
+  const start = recent[0];
+  const end = recent[recent.length - 1];
+  const baselineLow = start <= 5;
+  const rawPct = ((end - start) / Math.max(start, 10)) * 100;
+  const pctClamped = clamp(rawPct, -200, 500);
+  const growthCapped = Math.abs(rawPct - pctClamped) > 0.01;
+  const safeGrowthPct = baselineLow ? null : Number(Math.abs(pctClamped).toFixed(1));
+  const growthDeltaPoints = Math.abs(Math.round(end - start));
+
+  let acceleration: number | null = null;
+  if (recent.length >= 6) {
+    const mid = Math.floor(recent.length / 2);
+    const firstSlope = (recent[mid] - recent[0]) / Math.max(mid, 1);
+    const secondSlope = (recent[recent.length - 1] - recent[mid]) / Math.max(recent.length - mid - 1, 1);
+    acceleration = Number(clamp(secondSlope - firstSlope, -10, 10).toFixed(2));
+  }
+
+  return {
+    growthMomentum,
+    safeGrowthPct,
+    growthDeltaPoints,
+    growthMode: baselineLow ? "points" : "percent",
+    growthCapped,
+    growthNote: baselineLow || growthCapped ? "Growth capped for low baseline." : undefined,
+    latestIndex,
+    acceleration,
+  };
 }
 
 function classifyTrend(input: {
@@ -73,7 +157,7 @@ function classifyTrend(input: {
 }
 
 function computeDynamicScores(params: {
-  google: { series: number[]; growthPct: number; spikeiness: number };
+  google: { series: number[]; growthMomentum: number; spikeiness: number };
   youtube: { recentCount: number; totalResults?: number };
   reddit: { mentionCount: number };
   hasTrends: boolean;
@@ -89,10 +173,9 @@ function computeDynamicScores(params: {
 
   if (hasTrends) {
     const series = google.series || [];
-    const slope = series.length > 1 ? (series[series.length - 1] - series[0]) / (series.length - 1) : 0;
     const volatilityPenalty = clamp((std(series) / Math.max(mean(series), 1)) * 55, 0, 45);
-    growingScore = clamp(42 + google.growthPct * 0.55 + slope * 4, 0, 100);
-    willLastScore = clamp(82 - google.spikeiness * 0.55 - volatilityPenalty + Math.max(0, google.growthPct * 0.08), 0, 100);
+    growingScore = clamp(google.growthMomentum, 0, 100);
+    willLastScore = clamp(82 - google.spikeiness * 0.55 - volatilityPenalty + growingScore * 0.08, 0, 100);
   } else if (hasYoutube && hasReddit) {
     growingScore = clamp(0.6 * ytMomentum + 0.4 * redditBuzz, 0, 100);
     const stability = 100 - Math.abs(ytMomentum - redditBuzz);
@@ -159,6 +242,7 @@ type Row = {
   formats: string[];
   pricing: { trial: [number, number]; monthly: [number, number]; bundle: [number, number] };
   google: { series: number[]; growthPct: number; spikeiness: number; related: string[]; keywordUsed?: string };
+  googleMeta: GoogleMeta;
   youtube: { recentCount: number; sampleTitles: string[]; totalResults: number; keywordUsed?: string; counts?: { d7: number | null; d30: number | null; d90: number | null } };
   reddit: { mentionCount: number; sampleThreads: string[]; keywordUsed?: string; counts?: { d30: number | null; d90: number | null } };
   sourcesUsed: string[];
@@ -199,6 +283,7 @@ export default async function handler(req: any, res: any) {
         formats,
         pricing,
         google: { series: [], growthPct: 0, spikeiness: 70, related: [] },
+        googleMeta: computeGoogleMeta([]),
         youtube: { recentCount: 0, sampleTitles: [], totalResults: 0 },
         reddit: { mentionCount: 0, sampleThreads: [] },
         sourcesUsed: [],
@@ -222,23 +307,29 @@ export default async function handler(req: any, res: any) {
 
           if (modeUsed === "calc") {
             const calc = buildCalculatedSignals(row.product.id, timeframeDays);
-            row.google = {
-              series: calc.timeline,
-              growthPct: calc.growthPct,
-              spikeiness: calc.spikeiness,
-              related: [],
-              keywordUsed: primary,
-            };
-            row.youtube = {
-              recentCount: calc.youtubeRecentCount.d30,
-              sampleTitles: [`${cleanText(row.product.name)} review`, `${cleanText(row.product.name)} explainer`],
-              totalResults: calc.youtubeRecentCount.d90 * 900,
-              keywordUsed: primary,
-              counts: {
+            const googleMeta = computeGoogleMeta(calc.timeline);
+            const calcYtCounts = applyYoutubeWindows(
+              {
                 d7: calc.youtubeRecentCount.d7,
                 d30: calc.youtubeRecentCount.d30,
                 d90: calc.youtubeRecentCount.d90,
               },
+              timeframeDays
+            );
+            row.google = {
+              series: calc.timeline,
+              growthPct: googleMeta.safeGrowthPct ?? 0,
+              spikeiness: calc.spikeiness,
+              related: [],
+              keywordUsed: primary,
+            };
+            row.googleMeta = googleMeta;
+            row.youtube = {
+              recentCount: calcYtCounts.d30 ?? calcYtCounts.d7 ?? calcYtCounts.d90 ?? 0,
+              sampleTitles: [`${cleanText(row.product.name)} review`, `${cleanText(row.product.name)} explainer`],
+              totalResults: calc.youtubeRecentCount.d90 * 900,
+              keywordUsed: primary,
+              counts: calcYtCounts,
             };
             row.reddit = {
               mentionCount: calc.redditMentions.d30,
@@ -311,19 +402,28 @@ export default async function handler(req: any, res: any) {
           const trendsValid =
             Boolean((gt as any)?.ok) &&
             (((gt as any)?.series?.length || 0) > 0 || Math.abs(Number((gt as any)?.growthPct || 0)) > 0);
-          const youtubeValid =
-            Boolean((yt as any)?.ok) &&
-            (Number((yt as any)?.recentCount || 0) > 0 || Number((yt as any)?.totalResults || 0) > 0);
+          const ytCounts = applyYoutubeWindows(
+            {
+              d7: (yt as any)?.counts?.d7 ?? null,
+              d30: (yt as any)?.counts?.d30 ?? null,
+              d90: (yt as any)?.counts?.d90 ?? null,
+            },
+            timeframeDays
+          );
+          const youtubeValid = Boolean((yt as any)?.ok) && Boolean((yt as any)?.hasValidDates);
           const redditValid = Boolean((rd as any)?.ok) && Number((rd as any)?.mentionCount || 0) > 0;
 
           if (trendsValid) {
+            const trendSeries = ((gt as any).series || []).map((v: any) => clamp(Number(v) || 0, 0, 100));
+            const googleMeta = computeGoogleMeta(trendSeries);
             row.google = {
-              series: (gt as any).series || [],
-              growthPct: Number((gt as any).growthPct || 0),
+              series: trendSeries,
+              growthPct: googleMeta.safeGrowthPct ?? 0,
               spikeiness: Number((gt as any).spikeiness || 70),
               related: [],
               keywordUsed: (gt as any).keywordUsed || primary,
             };
+            row.googleMeta = googleMeta;
             row.sourcesUsed.push("trends");
             trendsLiveSeen = true;
           } else {
@@ -333,16 +433,13 @@ export default async function handler(req: any, res: any) {
           }
 
           if (youtubeValid) {
+            const ytRecent = ytCounts.d30 ?? ytCounts.d7 ?? ytCounts.d90 ?? 0;
             row.youtube = {
-              recentCount: Number((yt as any).recentCount || 0),
+              recentCount: Number(ytRecent || 0),
               sampleTitles: ((yt as any).sampleTitles || []).map((t: string) => cleanText(t)).slice(0, 2),
               totalResults: Number((yt as any).totalResults || 0),
               keywordUsed: (yt as any).keywordUsed || primary,
-              counts: {
-                d7: windowDays <= 7 ? Number((yt as any).recentCount || 0) : null,
-                d30: windowDays <= 30 ? Number((yt as any).recentCount || 0) : null,
-                d90: Number((yt as any).recentCount || 0),
-              },
+              counts: ytCounts,
             };
             row.sourcesUsed.push("youtube");
             youtubeLiveSeen = true;
@@ -382,7 +479,11 @@ export default async function handler(req: any, res: any) {
       const hasReddit = row.sourcesUsed.includes("reddit");
 
       const dynamic = computeDynamicScores({
-        google: row.google,
+        google: {
+          series: row.google.series,
+          growthMomentum: row.googleMeta.growthMomentum,
+          spikeiness: row.google.spikeiness,
+        },
         youtube: row.youtube,
         reddit: row.reddit,
         hasTrends,
@@ -421,9 +522,13 @@ export default async function handler(req: any, res: any) {
         formats: row.formats.map((f) => cleanText(f)),
         pricing: row.pricing,
         metrics: {
-          growthPct: row.google.growthPct,
-          recentCount: row.youtube.recentCount,
-          mentionCount: row.reddit.mentionCount,
+          growthMomentum: row.googleMeta.growthMomentum,
+          growthDescriptor:
+            row.googleMeta.growthMode === "points"
+              ? `+${row.googleMeta.growthDeltaPoints ?? 0} points`
+              : `+${row.googleMeta.safeGrowthPct ?? 0}%`,
+          recentCount: hasYoutube ? row.youtube.recentCount : null,
+          mentionCount: hasReddit ? row.reddit.mentionCount : null,
           marketStrength: dynamic.marketStrength,
           fadRiskLabel,
         },
@@ -466,9 +571,9 @@ export default async function handler(req: any, res: any) {
         },
         youtube_titles: row.youtube.sampleTitles,
         youtube_counts: {
-          d7: row.youtube.counts?.d7 ?? (row.youtube.recentCount || null),
-          d30: row.youtube.counts?.d30 ?? (timeframeDays >= 60 ? row.youtube.recentCount || null : null),
-          d90: row.youtube.counts?.d90 ?? (timeframeDays >= 180 ? row.youtube.recentCount || null : null),
+          d7: row.youtube.counts?.d7 ?? null,
+          d30: row.youtube.counts?.d30 ?? null,
+          d90: row.youtube.counts?.d90 ?? null,
         },
         reddit_counts: {
           d30: row.reddit.counts?.d30 ?? (row.reddit.mentionCount || null),
@@ -477,7 +582,11 @@ export default async function handler(req: any, res: any) {
         google_trends_data: row.google.series,
         evidence_snippets: [memo.proof, ...memo.whyRealOrFad].map((x: string) => cleanText(x)),
         partial_data_note: "Full scan: Google Trends + YouTube (may take longer)",
-        proof_status: row.proofStatus || (noSignal ? "Not enough public signal for this phrasing yet" : undefined),
+        proof_status:
+          row.proofStatus ||
+          (noSignal
+            ? "Not enough public signal for this phrasing yet"
+            : row.googleMeta.growthNote || undefined),
         sourcesUsed: row.sourcesUsed,
         keyword_used: {
           trends: row.google.keywordUsed || null,
@@ -490,14 +599,21 @@ export default async function handler(req: any, res: any) {
           reddit: row.reddit.keywordUsed || null,
         },
         rawSignals: {
-          growthPct: hasTrends ? row.google.growthPct : null,
+          growthPct: hasTrends ? row.googleMeta.safeGrowthPct : null,
+          upwardMomentum: hasTrends ? row.googleMeta.growthMomentum : null,
+          growthDeltaPoints: hasTrends ? row.googleMeta.growthDeltaPoints : null,
+          growthMode: hasTrends ? row.googleMeta.growthMode : null,
+          growthCapped: hasTrends ? row.googleMeta.growthCapped : null,
+          growthNote: hasTrends ? row.googleMeta.growthNote || null : null,
+          latestIndex: hasTrends ? row.googleMeta.latestIndex : null,
+          acceleration: hasTrends ? row.googleMeta.acceleration : null,
           spikeiness: hasTrends ? row.google.spikeiness : null,
-          ytRecentCount: hasYoutube ? (row.youtube.counts?.d30 ?? row.youtube.recentCount) : null,
+          ytRecentCount: hasYoutube ? (row.youtube.counts?.d30 ?? row.youtube.counts?.d7 ?? row.youtube.counts?.d90 ?? row.youtube.recentCount) : null,
           ytTotalResults: hasYoutube ? row.youtube.totalResults : null,
           redditMentions: hasReddit ? (row.reddit.counts?.d30 ?? row.reddit.mentionCount) : null,
           sparklinePoints: hasTrends ? row.google.series.length : null,
         },
-        trendsGrowthPct: hasTrends ? row.google.growthPct : null,
+        trendsGrowthPct: hasTrends ? row.googleMeta.safeGrowthPct : null,
         trendsSparklinePointsCount: hasTrends ? row.google.series.length : null,
         youtubeRecentCount: hasYoutube ? row.youtube.recentCount : null,
         timings_ms: row.sourceTimingsMs,
